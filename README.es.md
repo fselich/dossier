@@ -6,6 +6,8 @@ Interfaz de terminal controlada por teclado para leer y navegar artefactos de pr
 
 > Desarrollado con OpenSpec. Este repositorio contiene 12 archivos de spec de proyecto y más de 20 cambios archivados que documentan el historial completo de desarrollo de la herramienta.
 
+![dossier demo](docs/dossier.gif)
+
 ---
 
 ## Funcionalidades
