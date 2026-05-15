@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -97,6 +98,8 @@ type Model struct {
 	indexCursor    int
 	expandedSpecs  map[int]bool
 	projectSpecs     []openspec.ProjectSpec
+	specSortBySuffix bool
+	specOrder        []int
 	specViewerCursor int    // which projectSpec is shown in ModeViewingSpec
 	specJumpTarget   string // requirement name to scroll to when entering ModeViewingSpec; empty = top
 	specFocusMode    bool   // true when ModeViewingSpec shows only the selected requirement
@@ -413,6 +416,30 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				// Space on a requirement item: no-op.
 			}
 
+		case "s":
+			if m.mode == ModeIndex {
+				savedKind := indexKindActive
+				savedIdx := -1
+				savedReqIdx := 0
+				if m.indexCursor < len(m.indexItems) {
+					item := m.indexItems[m.indexCursor]
+					savedKind = item.kind
+					savedIdx = item.idx
+					savedReqIdx = item.reqIdx
+				}
+				m.specSortBySuffix = !m.specSortBySuffix
+				m.buildIndexItems()
+				if savedIdx >= 0 {
+					for i, it := range m.indexItems {
+						if it.kind == savedKind && it.idx == savedIdx && it.reqIdx == savedReqIdx {
+							m.indexCursor = i
+							break
+						}
+					}
+				}
+				m.refreshIndexViewport()
+			}
+
 		case "e":
 			if m.mode == ModeNormal && m.tabAvailable(m.tab) {
 				path := m.artifactPath()
@@ -607,12 +634,34 @@ func (m *Model) enterIndex() {
 	m.refreshIndexViewport()
 }
 
+func specSuffix(name string) string {
+	if i := strings.LastIndex(name, "-"); i >= 0 {
+		return name[i+1:]
+	}
+	return name
+}
+
+func (m *Model) buildSpecOrder() {
+	n := len(m.projectSpecs)
+	m.specOrder = make([]int, n)
+	for i := range m.specOrder {
+		m.specOrder[i] = i
+	}
+	if m.specSortBySuffix {
+		sort.SliceStable(m.specOrder, func(a, b int) bool {
+			return specSuffix(m.projectSpecs[m.specOrder[a]].Name) < specSuffix(m.projectSpecs[m.specOrder[b]].Name)
+		})
+	}
+}
+
 func (m *Model) buildIndexItems() {
+	m.buildSpecOrder()
 	m.indexItems = nil
 	for i := range m.project.Changes {
 		m.indexItems = append(m.indexItems, indexItem{kind: indexKindActive, idx: i})
 	}
-	for i, ps := range m.projectSpecs {
+	for _, i := range m.specOrder {
+		ps := m.projectSpecs[i]
 		m.indexItems = append(m.indexItems, indexItem{kind: indexKindSpec, idx: i})
 		if m.expandedSpecs[i] {
 			for r := range ps.RequirementNames {
@@ -680,7 +729,8 @@ func (m *Model) renderIndexContent() (string, int) {
 				maxName = len(ps.Name)
 			}
 		}
-		for i, ps := range m.projectSpecs {
+		for _, i := range m.specOrder {
+			ps := m.projectSpecs[i]
 			cursor := m.indexCursor < len(m.indexItems) &&
 				m.indexItems[m.indexCursor].kind == indexKindSpec &&
 				m.indexItems[m.indexCursor].idx == i
@@ -1402,7 +1452,11 @@ func (m *Model) renderHelpBar() string {
 		return errStyle.Render(m.errMsg)
 	}
 	if m.mode == ModeIndex {
-		return helpStyle.Render("j/k: navigate  Enter: open  Space: expand  Esc: quit")
+		sortHint := "s: sort by suffix"
+		if m.specSortBySuffix {
+			sortHint = "s: sort by name"
+		}
+		return helpStyle.Render("j/k: navigate  Enter: open  Space: expand  " + sortHint + "  Esc: quit")
 	}
 	if m.mode == ModeViewingSpec {
 		if m.specFocusMode {
