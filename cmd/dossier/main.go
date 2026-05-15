@@ -5,8 +5,8 @@ import (
 	"os"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/felipesanchez/dossier/internal/openspec"
-	"github.com/felipesanchez/dossier/internal/ui"
+	"github.com/fselich/dossier/internal/openspec"
+	"github.com/fselich/dossier/internal/ui"
 )
 
 func main() {
