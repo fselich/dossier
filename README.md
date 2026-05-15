@@ -6,10 +6,6 @@ A keyboard-driven terminal UI for reading and navigating [OpenSpec](https://gith
 
 > Built with OpenSpec. This repository contains 12 project-level spec files and 20+ archived changes that document the complete development history of the tool.
 
-<div align="center">
-  <img src="docs/dossier.gif" alt="dossier demo">
-</div>
-
 ---
 
 ## Features
