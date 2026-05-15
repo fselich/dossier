@@ -67,11 +67,17 @@ Pressing `Enter` on an item SHALL close the index and open the selected change. 
 - **THEN** the mode switches to `ModeViewingArchive` showing the artifacts of that archived change
 
 ### Requirement: Helpbar del índice
-The helpbar in `ModeIndex` SHALL show `j/k: navigate  Enter: open  Esc: quit`.
+The helpbar in `ModeIndex` SHALL show navigation hints and SHALL reflect the current sort mode via the `s` binding label:
+- When sort mode is **name**: `j/k: navigate  Enter: open  Space: expand  s: sort by suffix  Esc: quit`
+- When sort mode is **suffix**: `j/k: navigate  Enter: open  Space: expand  s: sort by name  Esc: quit`
 
-#### Scenario: Helpbar visible en el índice
-- **WHEN** the mode is `ModeIndex`
-- **THEN** the helpbar shows `j/k: navigate  Enter: open  Esc: quit`
+#### Scenario: Helpbar en modo sort normal
+- **WHEN** the mode is `ModeIndex` and the sort order is **name**
+- **THEN** the helpbar shows `j/k: navigate  Enter: open  Space: expand  s: sort by suffix  Esc: quit`
+
+#### Scenario: Helpbar en modo sort por sufijo
+- **WHEN** the mode is `ModeIndex` and the sort order is **suffix**
+- **THEN** the helpbar shows `j/k: navigate  Enter: open  Space: expand  s: sort by name  Esc: quit`
 
 ### Requirement: Actualización en tiempo real del índice
 While the mode is `ModeIndex`, the TUI SHALL detect on each tick (≤ 500 ms) whether the list of active changes, the list of archived changes, or the list of project specs has changed on disk. If any change is detected, the index SHALL reload all three lists, rebuild the navigable items, and refresh the viewport without the user having to leave and re-enter `ModeIndex`. The cursor SHALL be preserved if the resulting index has at least as many items as the current position; otherwise it SHALL move to the last available item.
