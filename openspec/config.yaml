@@ -1,20 +1,16 @@
 schema: spec-driven
 
-# Project context (optional)
-# This is shown to AI when creating artifacts.
-# Add your tech stack, conventions, style guides, domain knowledge, etc.
-# Example:
-#   context: |
-#     Tech stack: TypeScript, React, Node.js
-#     We use conventional commits
-#     Domain: e-commerce platform
+context: |
+  All artifacts (proposals, designs, specs, tasks) must be written in English.
 
-# Per-artifact rules (optional)
-# Add custom rules for specific artifacts.
-# Example:
-#   rules:
-#     proposal:
-#       - Keep proposals under 500 words
-#       - Always include a "Non-goals" section
-#     tasks:
-#       - Break tasks into chunks of max 2 hours
+  Tech stack: Go 1.25, Bubble Tea (Elm-architecture TUI), Bubbles, Glamour, Lipgloss.
+  Domain: terminal UI tool for navigating OpenSpec project artifacts (proposals, designs, specs, tasks).
+  The project itself follows OpenSpec (spec-driven development): changes live under openspec/changes/, long-lived specs under openspec/specs/.
+
+rules:
+  proposal:
+    - Always include a "Non-goals" section to make scope boundaries explicit
+    - Keep proposals concise; prefer bullet points over prose
+  tasks:
+    - Break tasks into small, independently completable steps
+    - When applicable, include a task for writing or updating tests
