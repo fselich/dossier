@@ -341,10 +341,12 @@ func (m *Model) renderActiveItem(ch openspec.Change, cursor bool, contentWidth i
 		barSpace = 4
 	}
 	filled := (done * barSpace) / total
+	filledStyle := progressDoneStyle
 	if done == total {
 		filled = barSpace
+		filledStyle = progressCompleteStyle
 	}
-	bar := "[" + progressDoneStyle.Render(strings.Repeat("█", filled)) +
+	bar := "[" + filledStyle.Render(strings.Repeat("█", filled)) +
 		progressEmptyStyle.Render(strings.Repeat("░", barSpace-filled)) + "]" +
 		helpStyle.Render(countStr)
 
