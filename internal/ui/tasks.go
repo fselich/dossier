@@ -127,8 +127,9 @@ func (m *Model) renderTasksContent() (string, int) {
 				line++
 			}
 			done, total := sectionProgress(m.taskItems, i)
-			sb.WriteString(sectionStyle.Render("  "+item.Text) + "  " + progressBar(done, total, 5) + "\n")
-			line++
+			sectionLine := sectionStyle.Render("  "+item.Text) + "  " + progressBar(done, total, 5)
+			sb.WriteString(sectionLine + "\n")
+			line += lipgloss.Height(sectionLine)
 			sb.WriteString("\n")
 			line++
 		case openspec.KindTask:
@@ -159,7 +160,7 @@ func (m *Model) renderTasksContent() (string, int) {
 				rendered = taskPendingStyle.Width(contentWidth).Render(text)
 			}
 			sb.WriteString(rendered + "\n")
-			line++
+			line += lipgloss.Height(rendered)
 		}
 	}
 	return sb.String(), cursorLine
