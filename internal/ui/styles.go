@@ -48,7 +48,10 @@ var (
 			Bold(true)
 
 	progressDoneStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("10"))
+				Foreground(lipgloss.Color("6"))
+
+	progressCompleteStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("2"))
 
 	progressEmptyStyle = lipgloss.NewStyle().
 				Foreground(lipgloss.Color("8"))

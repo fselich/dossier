@@ -183,10 +183,12 @@ func progressBar(done, total, width int) string {
 		return ""
 	}
 	filled := (done * width) / total
+	filledStyle := progressDoneStyle
 	if done == total {
 		filled = width
+		filledStyle = progressCompleteStyle
 	}
-	bar := progressDoneStyle.Render(strings.Repeat("─", filled)) +
+	bar := filledStyle.Render(strings.Repeat("─", filled)) +
 		progressEmptyStyle.Render(strings.Repeat("─", width-filled))
 	return bar + helpStyle.Render(fmt.Sprintf(" %d/%d", done, total))
 }

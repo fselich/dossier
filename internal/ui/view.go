@@ -121,10 +121,12 @@ func (m *Model) renderTabBar() string {
 		barSpace := (m.width-2) - lipgloss.Width(tabs) - 3 - len(label)
 		if barSpace >= 3 {
 			filled := (done * barSpace) / total
+			filledStyle := progressDoneStyle
 			if done == total {
 				filled = barSpace
+				filledStyle = progressCompleteStyle
 			}
-			bar := "[" + progressDoneStyle.Render(strings.Repeat("█", filled)) +
+			bar := "[" + filledStyle.Render(strings.Repeat("█", filled)) +
 				progressEmptyStyle.Render(strings.Repeat("░", barSpace-filled)) + "]"
 			tabs = tabs + " " + bar + helpStyle.Render(label)
 		}
