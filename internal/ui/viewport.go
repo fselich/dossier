@@ -8,6 +8,29 @@ import (
 	"github.com/charmbracelet/glamour"
 )
 
+func extractRequirement(raw, name string) string {
+	target := "### Requirement: " + name
+	lines := strings.Split(raw, "\n")
+	start := -1
+	for i, l := range lines {
+		if l == target {
+			start = i
+			break
+		}
+	}
+	if start < 0 {
+		return ""
+	}
+	block := []string{lines[start]}
+	for _, l := range lines[start+1:] {
+		if strings.HasPrefix(l, "### Requirement: ") {
+			break
+		}
+		block = append(block, l)
+	}
+	return strings.Join(block, "\n")
+}
+
 func (m *Model) loadViewport() tea.Cmd {
 	if !m.vpReady {
 		return nil
