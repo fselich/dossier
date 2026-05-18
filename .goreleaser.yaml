@@ -1,0 +1,66 @@
+project_name: dossier
+version: 2
+
+before:
+  hooks:
+    - go mod tidy
+    - go test -v ./...
+
+builds:
+  -
+    id: dossier-linux
+    main: ./cmd/dossier/main.go
+    binary: dossier
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X main.version={{ .Version }}
+    env:
+      - CGO_ENABLED=0
+    mod_timestamp: '{{ .CommitTimestamp }}'
+
+archives:
+  -
+    id: dossier-archive
+    builds: [dossier-linux]
+    name_template: "{{ .ProjectName }}-{{ .Os }}-{{ .Arch }}"
+    format: tar.gz
+    files:
+      - LICENSE
+      - README.md
+      - README.es.md
+    wrap_in_directory: false
+
+checksum:
+  name_template: 'checksums.txt'
+  algorithm: sha256
+
+release:
+  github:
+    owner: fselich
+    name: dossier
+  name_template: "v{{ .Version }}"
+  draft: false
+  prerelease: auto
+  mode: replace
+
+brews:
+  -
+    name: dossier
+    homepage: https://github.com/fselich/dossier
+    description: "Keyboard-driven TUI for navigating OpenSpec project artifacts"
+    license: MIT
+    repository:
+      owner: fselich
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    install: |
+      bin.install "dossier"
+    test: |
+      system "#{bin}/dossier", "--help"
+
+snapshot:
+  name_template: "{{ incpatch .Version }}-next"
