@@ -25,20 +25,22 @@ func main() {
 		os.Exit(0)
 	}
 
+	cfg := openspec.LoadConfig()
+
 	if len(os.Args) > 1 {
 		project, err = openspec.LoadFromPath(os.Args[1])
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "error:", err)
 			os.Exit(1)
 		}
-		model = ui.NewSinglePath(project)
+		model = ui.NewSinglePath(project, cfg)
 	} else {
 		project, err = openspec.Load()
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
-		model = ui.New(project)
+		model = ui.New(project, cfg)
 	}
 
 	p := tea.NewProgram(model, tea.WithAltScreen())

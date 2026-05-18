@@ -84,6 +84,32 @@ type openspecMeta struct {
 	Created string `yaml:"created"`
 }
 
+type ProjectConfig struct {
+	Context string
+	Rules   map[string][]string
+}
+
+type projectConfigYAML struct {
+	Context string              `yaml:"context"`
+	Rules   map[string][]string `yaml:"rules"`
+}
+
+func LoadConfig() ProjectConfig {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return ProjectConfig{}
+	}
+	data, err := os.ReadFile(filepath.Join(cwd, "openspec", "config.yaml"))
+	if err != nil {
+		return ProjectConfig{}
+	}
+	var raw projectConfigYAML
+	if err := yaml.Unmarshal(data, &raw); err != nil {
+		return ProjectConfig{}
+	}
+	return ProjectConfig{Context: strings.TrimSpace(raw.Context), Rules: raw.Rules}
+}
+
 func Load() (*Project, error) {
 	cwd, err := os.Getwd()
 	if err != nil {

@@ -48,6 +48,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case renderedConfigMsg:
+		m.loading = false
+		if m.mode == ModeViewingConfig {
+			m.vp.SetContent(msg.content)
+			m.vp.GotoTop()
+		}
+		return m, nil
+
 	case tickMsg:
 		cmd := m.handleTick()
 		nextTick := tea.Tick(500*time.Millisecond, func(t time.Time) tea.Msg { return tickMsg(t) })
@@ -92,7 +100,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "q", "ctrl+c":
+			if m.mode == ModeViewingConfig {
+				m.mode = m.prevMode
+				m.vp.Height = m.contentHeight()
+				return m, m.loadViewport()
+			}
 			return m, tea.Quit
+
+		case "i":
+			if m.mode == ModeIndex || m.mode == ModeNormal {
+				m.prevMode = m.mode
+				m.mode = ModeViewingConfig
+				m.vp.Height = m.contentHeight()
+				return m, m.loadViewport()
+			}
 
 		case "a":
 			if m.mode == ModeNormal || m.mode == ModeViewingArchive {
@@ -101,6 +122,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case "esc":
 			switch m.mode {
+			case ModeViewingConfig:
+				m.mode = m.prevMode
+				m.vp.Height = m.contentHeight()
+				return m, m.loadViewport()
 			case ModeNormal, ModeViewingArchive:
 				m.enterIndex()
 			case ModeIndex:

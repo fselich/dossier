@@ -17,6 +17,7 @@ const (
 	ModeIndex
 	ModeViewingArchive
 	ModeViewingSpec
+	ModeViewingConfig
 )
 
 type Tab int
@@ -44,6 +45,11 @@ type renderedMsg struct {
 type specRenderedMsg struct {
 	content  string
 	jumpLine int // line offset to scroll to after render; 0 = start of document
+}
+
+// renderedConfigMsg carries async glamour output for ModeViewingConfig.
+type renderedConfigMsg struct {
+	content string
 }
 
 type tickMsg time.Time
@@ -85,6 +91,7 @@ type Model struct {
 	renderCache map[Tab]string
 
 	mode           Mode
+	prevMode       Mode
 	archiveChanges []openspec.Change
 	archiveCursor  int // which archived change is viewed in ModeViewingArchive
 	indexItems     []indexItem
@@ -97,10 +104,11 @@ type Model struct {
 	specJumpTarget   string // requirement name to scroll to when entering ModeViewingSpec; empty = top
 	specFocusMode    bool   // true when ModeViewingSpec shows only the selected requirement
 	specReqCursor    int    // index into projectSpecs[specViewerCursor].RequirementNames in focus mode
+	projectConfig    openspec.ProjectConfig
 }
 
-func New(project *openspec.Project) Model {
-	m := Model{project: project, renderCache: make(map[Tab]string)}
+func New(project *openspec.Project, cfg openspec.ProjectConfig) Model {
+	m := Model{project: project, renderCache: make(map[Tab]string), projectConfig: cfg}
 	if len(project.Changes) > 0 {
 		m.tab = m.defaultTab()
 		m.loadTaskItems()
@@ -108,8 +116,8 @@ func New(project *openspec.Project) Model {
 	return m
 }
 
-func NewSinglePath(project *openspec.Project) Model {
-	m := New(project)
+func NewSinglePath(project *openspec.Project, cfg openspec.ProjectConfig) Model {
+	m := New(project, cfg)
 	m.singlePath = true
 	return m
 }
@@ -222,7 +230,7 @@ func (m *Model) currentArchive() *openspec.Change {
 }
 
 func (m *Model) contentHeight() int {
-	if m.mode == ModeIndex || m.mode == ModeViewingSpec {
+	if m.mode == ModeIndex || m.mode == ModeViewingSpec || m.mode == ModeViewingConfig {
 		// top+bottom borders + header + 2 inner seps + helpBar (no tab bar)
 		h := m.height - 6
 		if h < 1 {

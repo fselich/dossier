@@ -39,6 +39,33 @@ func (m *Model) loadViewport() tea.Cmd {
 		m.refreshIndexViewport()
 		return nil
 	}
+	if m.mode == ModeViewingConfig {
+		raw := configToMarkdown(m.projectConfig)
+		if raw == "" {
+			m.vp.SetContent("  (no project config found)")
+			return nil
+		}
+		m.loading = true
+		m.vp.SetContent("\n  Loading...")
+		width := m.width - 2
+		if width < 20 {
+			width = 80
+		}
+		return func() tea.Msg {
+			r, err := glamour.NewTermRenderer(
+				glamour.WithStandardStyle("dark"),
+				glamour.WithWordWrap(width),
+			)
+			if err != nil {
+				return renderedConfigMsg{content: raw}
+			}
+			out, err := r.Render(raw)
+			if err != nil {
+				return renderedConfigMsg{content: raw}
+			}
+			return renderedConfigMsg{content: out}
+		}
+	}
 	if m.mode == ModeViewingSpec {
 		if m.specViewerCursor >= len(m.projectSpecs) {
 			m.vp.SetContent("  (spec not available)")

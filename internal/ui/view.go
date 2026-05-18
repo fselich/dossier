@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -11,6 +12,9 @@ import (
 func (m Model) View() string {
 	if !m.vpReady {
 		return ""
+	}
+	if m.mode == ModeViewingConfig {
+		return m.viewConfig()
 	}
 	if m.mode == ModeIndex || m.mode == ModeViewingSpec {
 		return m.viewIndex()
@@ -50,6 +54,9 @@ func (m *Model) viewIndex() string {
 }
 
 func (m *Model) renderHeader() string {
+	if m.mode == ModeViewingConfig {
+		return headerStyle.Width(m.width - 2).Render(m.project.Name + "  ·  project config")
+	}
 	if m.mode == ModeIndex {
 		return headerStyle.Width(m.width - 2).Render(m.project.Name + "  ·  index")
 	}
@@ -193,7 +200,10 @@ func (m *Model) renderHelpBar() string {
 		if m.specSortBySuffix {
 			sortHint = "s: sort by name"
 		}
-		return helpStyle.Render("j/k: navigate  Enter: open  Space: expand  " + sortHint + "  Esc: quit")
+		return helpStyle.Render("j/k: navigate  Enter: open  Space: expand  " + sortHint + "  i: info  Esc: quit")
+	}
+	if m.mode == ModeViewingConfig {
+		return helpStyle.Render("j/k: scroll  i/Esc: back  q: quit")
 	}
 	if m.mode == ModeViewingSpec {
 		if m.specFocusMode {
@@ -205,13 +215,57 @@ func (m *Model) renderHelpBar() string {
 		return helpStyle.Render("1-4: artifact  j/k: scroll  a/Esc: index  q: quit")
 	}
 	if m.tab == TabTasks {
-		return helpStyle.Render("h/l: change  1-4: artifact  j/k: navigate  Space: toggle  e: edit  Esc: index  q: quit")
+		return helpStyle.Render("h/l: change  1-4: artifact  j/k: navigate  Space: toggle  e: edit  i: info  Esc: index  q: quit")
 	}
-	return helpStyle.Render("h/l: change  1-4: artifact  j/k: scroll  e: edit  Esc: index  q: quit")
+	return helpStyle.Render("h/l: change  1-4: artifact  j/k: scroll  e: edit  i: info  Esc: index  q: quit")
 }
 
 func (m *Model) emptyView() string {
 	return headerStyle.Render(m.project.Name) +
 		"\n\n\n  No active changes. Create one with /opsx:propose\n" +
 		helpStyle.Render("\n  a/Esc: index  q: quit")
+}
+
+func (m *Model) viewConfig() string {
+	rows := []string{
+		m.boxTop(),
+		m.addBorderSides(m.renderHeader()),
+		m.boxInnerSep(),
+		m.addBorderSides(m.vp.View()),
+		m.boxInnerSep(),
+		m.addBorderSides(m.renderHelpBar()),
+		m.boxBottom(),
+	}
+	return strings.Join(rows, "\n")
+}
+
+func configToMarkdown(cfg openspec.ProjectConfig) string {
+	var sb strings.Builder
+	if cfg.Context != "" {
+		sb.WriteString("## Context\n\n")
+		sb.WriteString(cfg.Context)
+		sb.WriteString("\n")
+	}
+	if len(cfg.Rules) > 0 {
+		if cfg.Context != "" {
+			sb.WriteString("\n")
+		}
+		sb.WriteString("## Rules\n")
+		keys := make([]string, 0, len(cfg.Rules))
+		for k := range cfg.Rules {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			sb.WriteString("\n### ")
+			sb.WriteString(k)
+			sb.WriteString("\n\n")
+			for _, item := range cfg.Rules[k] {
+				sb.WriteString("- ")
+				sb.WriteString(item)
+				sb.WriteString("\n")
+			}
+		}
+	}
+	return sb.String()
 }
