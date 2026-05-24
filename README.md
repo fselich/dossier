@@ -28,6 +28,10 @@ A keyboard-driven terminal UI for reading and navigating [OpenSpec](https://gith
 **Requirements:** Go 1.25 or later, terminal with ANSI color support.
 
 ```bash
+# Homebrew
+brew tap fselich/tap
+brew install dossier
+
 # From source
 git clone https://github.com/fselich/dossier
 cd dossier

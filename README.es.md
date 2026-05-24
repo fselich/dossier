@@ -28,6 +28,10 @@ Interfaz de terminal controlada por teclado para leer y navegar artefactos de pr
 **Requisitos:** Go 1.25 o posterior, terminal con soporte de color ANSI.
 
 ```bash
+# Homebrew
+brew tap fselich/tap
+brew install dossier
+
 # Desde el código fuente
 git clone https://github.com/fselich/dossier
 cd dossier
