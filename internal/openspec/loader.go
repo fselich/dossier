@@ -25,7 +25,7 @@ type Change struct {
 	Name        string
 	Path        string
 	Created     string
-	DisplayDate string // "DD Mon" for archive entries, empty for active changes
+	DisplayDate string
 	Proposal    Artifact
 	Design      Artifact
 	Tasks       Artifact
@@ -45,40 +45,6 @@ type ProjectSpec struct {
 	Content          string
 }
 
-// LoadProjectSpecs reads openspec/specs/ and returns one ProjectSpec per subdirectory,
-// sorted alphabetically by name.
-func LoadProjectSpecs() []ProjectSpec {
-	cwd, err := os.Getwd()
-	if err != nil {
-		return nil
-	}
-	specsDir := filepath.Join(cwd, "openspec", "specs")
-	entries, err := os.ReadDir(specsDir)
-	if err != nil {
-		return nil
-	}
-
-	var specs []ProjectSpec
-	for _, e := range entries {
-		if !e.IsDir() {
-			continue
-		}
-		ps := ProjectSpec{Name: e.Name()}
-		if data, err := os.ReadFile(filepath.Join(specsDir, e.Name(), "spec.md")); err == nil {
-			ps.Content = string(data)
-			for _, line := range strings.Split(ps.Content, "\n") {
-				if strings.HasPrefix(line, "### Requirement: ") {
-					ps.RequirementCount++
-					ps.RequirementNames = append(ps.RequirementNames, strings.TrimPrefix(line, "### Requirement: "))
-				}
-			}
-		}
-		specs = append(specs, ps)
-	}
-	sort.Slice(specs, func(i, j int) bool { return specs[i].Name < specs[j].Name })
-	return specs
-}
-
 type openspecMeta struct {
 	Schema  string `yaml:"schema"`
 	Created string `yaml:"created"`
@@ -94,34 +60,15 @@ type projectConfigYAML struct {
 	Rules   map[string][]string `yaml:"rules"`
 }
 
-func LoadConfig() ProjectConfig {
-	cwd, err := os.Getwd()
-	if err != nil {
-		return ProjectConfig{}
-	}
-	data, err := os.ReadFile(filepath.Join(cwd, "openspec", "config.yaml"))
-	if err != nil {
-		return ProjectConfig{}
-	}
-	var raw projectConfigYAML
-	if err := yaml.Unmarshal(data, &raw); err != nil {
-		return ProjectConfig{}
-	}
-	return ProjectConfig{Context: strings.TrimSpace(raw.Context), Rules: raw.Rules}
-}
+// ── *From(root) variants ──────────────────────────────────────────────────────
 
-func Load() (*Project, error) {
-	cwd, err := os.Getwd()
-	if err != nil {
-		return nil, err
-	}
-
-	openspecDir := filepath.Join(cwd, "openspec")
+func LoadFrom(root string) (*Project, error) {
+	openspecDir := filepath.Join(root, "openspec")
 	if _, err := os.Stat(openspecDir); os.IsNotExist(err) {
-		return nil, fmt.Errorf("no openspec/ directory found in current directory")
+		return nil, fmt.Errorf("no openspec/ directory found in %s", root)
 	}
 
-	project := &Project{Name: filepath.Base(cwd)}
+	project := &Project{Name: filepath.Base(root)}
 
 	changesDir := filepath.Join(openspecDir, "changes")
 	entries, err := os.ReadDir(changesDir)
@@ -155,8 +102,202 @@ func Load() (*Project, error) {
 	return project, nil
 }
 
-// LoadFromPath loads a single change from an explicit directory path.
-// The directory must exist and contain a .openspec.yaml file.
+func LoadConfigFrom(root string) (ProjectConfig, error) {
+	data, err := os.ReadFile(filepath.Join(root, "openspec", "config.yaml"))
+	if err != nil {
+		if os.IsNotExist(err) {
+			return ProjectConfig{}, nil
+		}
+		return ProjectConfig{}, nil
+	}
+	var raw projectConfigYAML
+	if err := yaml.Unmarshal(data, &raw); err != nil {
+		return ProjectConfig{}, fmt.Errorf("openspec/config.yaml: %w", err)
+	}
+	return ProjectConfig{Context: strings.TrimSpace(raw.Context), Rules: raw.Rules}, nil
+}
+
+func LoadProjectSpecsFrom(root string) ([]ProjectSpec, error) {
+	specsDir := filepath.Join(root, "openspec", "specs")
+	entries, err := os.ReadDir(specsDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	var specs []ProjectSpec
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		ps := ProjectSpec{Name: e.Name()}
+		if data, err := os.ReadFile(filepath.Join(specsDir, e.Name(), "spec.md")); err == nil {
+			ps.Content = string(data)
+			for _, line := range strings.Split(ps.Content, "\n") {
+				if strings.HasPrefix(line, "### Requirement: ") {
+					ps.RequirementCount++
+					ps.RequirementNames = append(ps.RequirementNames, strings.TrimPrefix(line, "### Requirement: "))
+				}
+			}
+		}
+		specs = append(specs, ps)
+	}
+	sort.Slice(specs, func(i, j int) bool { return specs[i].Name < specs[j].Name })
+	return specs, nil
+}
+
+func ListChangeNamesFrom(root string) ([]string, error) {
+	entries, err := os.ReadDir(filepath.Join(root, "openspec", "changes"))
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	var names []string
+	for _, e := range entries {
+		if e.IsDir() && e.Name() != "archive" {
+			names = append(names, e.Name())
+		}
+	}
+	return names, nil
+}
+
+func ListArchiveChangesFrom(root string) ([]Change, error) {
+	archiveDir := filepath.Join(root, "openspec", "changes", "archive")
+	entries, err := os.ReadDir(archiveDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	dirs := make([]string, 0, len(entries))
+	for _, e := range entries {
+		if e.IsDir() {
+			dirs = append(dirs, e.Name())
+		}
+	}
+	sort.Sort(sort.Reverse(sort.StringSlice(dirs)))
+
+	var changes []Change
+	for _, dir := range dirs {
+		cp := filepath.Join(archiveDir, dir)
+		cleanName, dispDate := parseArchiveName(dir)
+		ch := Change{Name: cleanName, Path: cp, DisplayDate: dispDate}
+		if raw, err := os.ReadFile(filepath.Join(cp, ".openspec.yaml")); err == nil {
+			var m openspecMeta
+			_ = yaml.Unmarshal(raw, &m)
+			ch.Created = m.Created
+		}
+		ch.Proposal = loadFile(filepath.Join(cp, "proposal.md"))
+		ch.Design = loadFile(filepath.Join(cp, "design.md"))
+		ch.Tasks = loadFile(filepath.Join(cp, "tasks.md"))
+		ch.Specs, ch.SpecFiles = loadSpecs(filepath.Join(cp, "specs"))
+		changes = append(changes, ch)
+	}
+	return changes, nil
+}
+
+func ListArchiveNamesFrom(root string) ([]string, error) {
+	entries, err := os.ReadDir(filepath.Join(root, "openspec", "changes", "archive"))
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	var names []string
+	for _, e := range entries {
+		if e.IsDir() {
+			names = append(names, e.Name())
+		}
+	}
+	sort.Sort(sort.Reverse(sort.StringSlice(names)))
+	return names, nil
+}
+
+func ListSpecNamesFrom(root string) ([]string, error) {
+	entries, err := os.ReadDir(filepath.Join(root, "openspec", "specs"))
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	var names []string
+	for _, e := range entries {
+		if e.IsDir() {
+			names = append(names, e.Name())
+		}
+	}
+	sort.Strings(names)
+	return names, nil
+}
+
+// ── Zero-argument wrappers (delegate to *From with os.Getwd()) ─────────────────
+
+func Load() (*Project, error) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return nil, err
+	}
+	return LoadFrom(cwd)
+}
+
+func LoadConfig() (ProjectConfig, error) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return ProjectConfig{}, err
+	}
+	return LoadConfigFrom(cwd)
+}
+
+func LoadProjectSpecs() ([]ProjectSpec, error) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return nil, err
+	}
+	return LoadProjectSpecsFrom(cwd)
+}
+
+func ListArchiveChanges() ([]Change, error) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return nil, err
+	}
+	return ListArchiveChangesFrom(cwd)
+}
+
+func ListArchiveNames() ([]string, error) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return nil, err
+	}
+	return ListArchiveNamesFrom(cwd)
+}
+
+func ListSpecNames() ([]string, error) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return nil, err
+	}
+	return ListSpecNamesFrom(cwd)
+}
+
+func ListChangeNames() ([]string, error) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return nil, err
+	}
+	return ListChangeNamesFrom(cwd)
+}
+
+// ── Path-based loader (unchanged) ──────────────────────────────────────────────
+
 func LoadFromPath(path string) (*Project, error) {
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		return nil, fmt.Errorf("path not found: %s", path)
@@ -185,9 +326,8 @@ func LoadFromPath(path string) (*Project, error) {
 	return project, nil
 }
 
-// parseArchiveName splits a directory name of the form "YYYY-MM-DD-<name>"
-// into a clean name and a formatted date string ("dd/mm/yyyy").
-// If the format does not match, it returns the full dir name and an empty date.
+// ── Helpers ────────────────────────────────────────────────────────────────────
+
 func parseArchiveName(dir string) (name, date string) {
 	if len(dir) > 11 && dir[4] == '-' && dir[7] == '-' && dir[10] == '-' {
 		t, err := time.Parse("2006-01-02", dir[:10])
@@ -198,114 +338,6 @@ func parseArchiveName(dir string) (name, date string) {
 	return dir, ""
 }
 
-// ListArchiveChanges loads all changes from openspec/changes/archive/, most recent first.
-func ListArchiveChanges() []Change {
-	cwd, err := os.Getwd()
-	if err != nil {
-		return nil
-	}
-	archiveDir := filepath.Join(cwd, "openspec", "changes", "archive")
-	entries, err := os.ReadDir(archiveDir)
-	if err != nil {
-		return nil
-	}
-
-	// Collect dir names and sort descending (most recent first by name prefix).
-	dirs := make([]string, 0, len(entries))
-	for _, e := range entries {
-		if e.IsDir() {
-			dirs = append(dirs, e.Name())
-		}
-	}
-	sort.Sort(sort.Reverse(sort.StringSlice(dirs)))
-
-	var changes []Change
-	for _, dir := range dirs {
-		cp := filepath.Join(archiveDir, dir)
-		cleanName, dispDate := parseArchiveName(dir)
-		ch := Change{Name: cleanName, Path: cp, DisplayDate: dispDate}
-		if raw, err := os.ReadFile(filepath.Join(cp, ".openspec.yaml")); err == nil {
-			var m openspecMeta
-			_ = yaml.Unmarshal(raw, &m)
-			ch.Created = m.Created
-		}
-		ch.Proposal = loadFile(filepath.Join(cp, "proposal.md"))
-		ch.Design = loadFile(filepath.Join(cp, "design.md"))
-		ch.Tasks = loadFile(filepath.Join(cp, "tasks.md"))
-		ch.Specs, ch.SpecFiles = loadSpecs(filepath.Join(cp, "specs"))
-		changes = append(changes, ch)
-	}
-	return changes
-}
-
-// ListArchiveNames returns the names of archived change directories on disk,
-// sorted descending to match ListArchiveChanges() order.
-// It only reads the directory listing — no artifact files — so it is cheap
-// to call on every poll tick.
-func ListArchiveNames() []string {
-	cwd, err := os.Getwd()
-	if err != nil {
-		return nil
-	}
-	entries, err := os.ReadDir(filepath.Join(cwd, "openspec", "changes", "archive"))
-	if err != nil {
-		return nil
-	}
-	var names []string
-	for _, e := range entries {
-		if e.IsDir() {
-			names = append(names, e.Name())
-		}
-	}
-	sort.Sort(sort.Reverse(sort.StringSlice(names)))
-	return names
-}
-
-// ListSpecNames returns the names of project spec directories on disk,
-// sorted alphabetically to match LoadProjectSpecs() order.
-// It only reads the directory listing — no artifact files — so it is cheap
-// to call on every poll tick.
-func ListSpecNames() []string {
-	cwd, err := os.Getwd()
-	if err != nil {
-		return nil
-	}
-	entries, err := os.ReadDir(filepath.Join(cwd, "openspec", "specs"))
-	if err != nil {
-		return nil
-	}
-	var names []string
-	for _, e := range entries {
-		if e.IsDir() {
-			names = append(names, e.Name())
-		}
-	}
-	sort.Strings(names)
-	return names
-}
-
-// ListChangeNames returns the names of active change directories on disk.
-// It only reads the directory listing — no artifact files — so it is cheap
-// to call on every poll tick.
-func ListChangeNames() []string {
-	cwd, err := os.Getwd()
-	if err != nil {
-		return nil
-	}
-	entries, err := os.ReadDir(filepath.Join(cwd, "openspec", "changes"))
-	if err != nil {
-		return nil
-	}
-	var names []string
-	for _, e := range entries {
-		if e.IsDir() && e.Name() != "archive" {
-			names = append(names, e.Name())
-		}
-	}
-	return names
-}
-
-// ReloadChange rereads all artifact files for an existing Change from disk.
 func ReloadChange(ch Change) Change {
 	ch.Proposal = loadFile(filepath.Join(ch.Path, "proposal.md"))
 	ch.Design = loadFile(filepath.Join(ch.Path, "design.md"))

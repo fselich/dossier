@@ -75,6 +75,8 @@ type Theme struct {
 }
 
 type Model struct {
+	root string
+
 	project   *openspec.Project
 	changeIdx int
 	tab       Tab
@@ -88,8 +90,8 @@ type Model struct {
 	specIdx int
 
 	errMsg     string
-	loading    bool // true while glamour renders in background
-	singlePath bool // true when launched with an explicit change path
+	loading    bool
+	singlePath bool
 
 	width, height int
 
@@ -98,27 +100,28 @@ type Model struct {
 	mode           Mode
 	prevMode       Mode
 	archiveChanges []openspec.Change
-	archiveCursor  int // which archived change is viewed in ModeViewingArchive
+	archiveCursor  int
 	indexItems     []indexItem
 	indexCursor    int
 	expandedSpecs  map[int]bool
 	projectSpecs     []openspec.ProjectSpec
 	specSortBySuffix bool
 	specOrder        []int
-	specViewerCursor int    // which projectSpec is shown in ModeViewingSpec
-	specJumpTarget   string // requirement name to scroll to when entering ModeViewingSpec; empty = top
-	specFocusMode    bool   // true when ModeViewingSpec shows only the selected requirement
-	specReqCursor    int    // index into projectSpecs[specViewerCursor].RequirementNames in focus mode
+	specViewerCursor int
+	specJumpTarget   string
+	specFocusMode    bool
+	specReqCursor    int
 	projectConfig    openspec.ProjectConfig
 	theme            Theme
 }
 
-func New(project *openspec.Project, cfg openspec.ProjectConfig) Model {
+func New(project *openspec.Project, cfg openspec.ProjectConfig, root string) Model {
 	m := Model{
-		project:     project,
-		renderCache: make(map[Tab]string),
+		root:          root,
+		project:       project,
+		renderCache:   make(map[Tab]string),
 		projectConfig: cfg,
-		theme:          Theme{ViewBg: lipgloss.NoColor{}},
+		theme:         Theme{ViewBg: lipgloss.NoColor{}},
 	}
 	if len(project.Changes) > 0 {
 		m.tab = m.defaultTab()
@@ -127,8 +130,8 @@ func New(project *openspec.Project, cfg openspec.ProjectConfig) Model {
 	return m
 }
 
-func NewSinglePath(project *openspec.Project, cfg openspec.ProjectConfig) Model {
-	m := New(project, cfg)
+func NewSinglePath(project *openspec.Project, cfg openspec.ProjectConfig, root string) Model {
+	m := New(project, cfg, root)
 	m.singlePath = true
 	return m
 }

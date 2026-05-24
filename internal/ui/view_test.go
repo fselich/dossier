@@ -7,63 +7,168 @@ import (
 	"github.com/fselich/dossier/internal/openspec"
 )
 
-func TestConfigToMarkdown(t *testing.T) {
-	t.Run("context output", func(t *testing.T) {
-		cfg := openspec.ProjectConfig{Context: "Tech stack: Go.\nDomain: TUI."}
-		out := configToMarkdown(cfg)
-		if !strings.Contains(out, "## Context") {
-			t.Error("expected '## Context' heading")
+func TestExtractRequirement(t *testing.T) {
+	raw := `# Spec
+
+### Requirement: Login
+The system SHALL authenticate users.
+
+#### Scenario: Success
+- **WHEN** valid credentials
+- **THEN** user is logged in
+
+### Requirement: Logout
+The system SHALL log out users.
+
+#### Scenario: Click logout
+- **WHEN** user clicks logout
+- **THEN** session ends
+`
+
+	t.Run("name found returns block", func(t *testing.T) {
+		result := extractRequirement(raw, "Login")
+		if !strings.Contains(result, "### Requirement: Login") {
+			t.Error("expected requirement header in result")
 		}
-		if !strings.Contains(out, "Tech stack: Go.") {
-			t.Error("expected context prose in output")
+		if !strings.Contains(result, "The system SHALL authenticate users") {
+			t.Error("expected requirement body in result")
+		}
+		if strings.Contains(result, "### Requirement: Logout") {
+			t.Error("expected block to stop at next requirement")
 		}
 	})
 
-	t.Run("rules grouping", func(t *testing.T) {
-		cfg := openspec.ProjectConfig{
-			Context: "Some context.",
-			Rules: map[string][]string{
-				"proposal": {"Keep it concise", "Include non-goals"},
-				"tasks":    {"Small steps"},
+	t.Run("name not found returns empty", func(t *testing.T) {
+		result := extractRequirement(raw, "Nonexistent")
+		if result != "" {
+			t.Errorf("expected empty result, got %q", result)
+		}
+	})
+
+	t.Run("last requirement in document", func(t *testing.T) {
+		result := extractRequirement(raw, "Logout")
+		if !strings.Contains(result, "### Requirement: Logout") {
+			t.Error("expected requirement header")
+		}
+		if !strings.Contains(result, "session ends") {
+			t.Error("expected full block for last requirement")
+		}
+	})
+
+	t.Run("requirement with no following header", func(t *testing.T) {
+		single := "### Requirement: Only\nJust one requirement."
+		result := extractRequirement(single, "Only")
+		if result != single {
+			t.Errorf("expected full content, got %q", result)
+		}
+	})
+}
+
+func TestFirstAvailableTab(t *testing.T) {
+	t.Run("change with all tabs", func(t *testing.T) {
+		ch := openspec.Change{
+			Proposal: openspec.Artifact{Present: true},
+			Design:   openspec.Artifact{Present: true},
+			Specs:    openspec.Artifact{Present: true},
+			Tasks:    openspec.Artifact{Present: true},
+		}
+		if got := firstAvailableTab(ch); got != TabProposal {
+			t.Errorf("expected TabProposal, got %d", got)
+		}
+	})
+
+	t.Run("change with only proposal and tasks", func(t *testing.T) {
+		ch := openspec.Change{
+			Proposal: openspec.Artifact{Present: true},
+			Tasks:    openspec.Artifact{Present: true},
+		}
+		if got := firstAvailableTab(ch); got != TabProposal {
+			t.Errorf("expected TabProposal, got %d", got)
+		}
+	})
+
+	t.Run("change with no artifacts", func(t *testing.T) {
+		ch := openspec.Change{}
+		if got := firstAvailableTab(ch); got != TabProposal {
+			t.Errorf("expected TabProposal as default, got %d", got)
+		}
+	})
+}
+
+func TestBuildIndexItems(t *testing.T) {
+	m := &Model{
+		project: &openspec.Project{
+			Changes: []openspec.Change{
+				{Name: "feat-a"},
+				{Name: "feat-b"},
 			},
+		},
+		expandedSpecs: make(map[int]bool),
+		archiveChanges: []openspec.Change{
+			{Name: "old-feat", DisplayDate: "01/05/2026"},
+		},
+		projectSpecs: []openspec.ProjectSpec{
+			{Name: "auth", RequirementCount: 1, RequirementNames: []string{"Login"}},
+		},
+	}
+
+	t.Run("with active changes specs and archived", func(t *testing.T) {
+		m.buildIndexItems()
+		if len(m.indexItems) != 4 {
+			t.Fatalf("expected 4 index items (2 active + 1 spec + 1 archive), got %d", len(m.indexItems))
 		}
-		out := configToMarkdown(cfg)
-		if !strings.Contains(out, "## Rules") {
-			t.Error("expected '## Rules' heading")
+		if m.indexItems[0].kind != indexKindActive {
+			t.Error("expected first item to be active change")
 		}
-		if !strings.Contains(out, "### proposal") {
-			t.Error("expected '### proposal' heading")
+		if m.indexItems[2].kind != indexKindSpec {
+			t.Error("expected third item to be spec")
 		}
-		if !strings.Contains(out, "### tasks") {
-			t.Error("expected '### tasks' heading")
-		}
-		if !strings.Contains(out, "- Keep it concise") {
-			t.Error("expected proposal rule as bullet")
-		}
-		if !strings.Contains(out, "- Small steps") {
-			t.Error("expected task rule as bullet")
+		if m.indexItems[3].kind != indexKindArchived {
+			t.Error("expected fourth item to be archived")
 		}
 	})
 
-	t.Run("empty config", func(t *testing.T) {
-		out := configToMarkdown(openspec.ProjectConfig{})
-		if out != "" {
-			t.Errorf("expected empty string for empty config, got %q", out)
+	t.Run("empty index", func(t *testing.T) {
+		empty := &Model{
+			project:       &openspec.Project{},
+			expandedSpecs: make(map[int]bool),
+		}
+		empty.buildIndexItems()
+		if len(empty.indexItems) != 0 {
+			t.Errorf("expected 0 items, got %d", len(empty.indexItems))
 		}
 	})
+}
 
-	t.Run("rules sorted alphabetically", func(t *testing.T) {
-		cfg := openspec.ProjectConfig{
-			Rules: map[string][]string{
-				"tasks":    {"step"},
-				"proposal": {"concise"},
+func TestRenderTasksContent(t *testing.T) {
+	t.Run("with task cursor", func(t *testing.T) {
+		m := &Model{
+			width: 80,
+			taskItems: []openspec.TaskItem{
+				{Kind: openspec.KindSection, Text: "Section 1", LineNum: 0},
+				{Kind: openspec.KindTask, Text: "do thing", Done: false, LineNum: 1},
+				{Kind: openspec.KindTask, Text: "another thing", Done: false, LineNum: 2},
 			},
+			taskCursor: 1,
 		}
-		out := configToMarkdown(cfg)
-		posProposal := strings.Index(out, "### proposal")
-		posTasks := strings.Index(out, "### tasks")
-		if posProposal > posTasks {
-			t.Error("expected 'proposal' to appear before 'tasks' (alphabetical order)")
+		content, cursorLine := m.renderTasksContent()
+		if cursorLine == 0 {
+			t.Error("expected non-zero cursor line")
+		}
+		if !strings.Contains(content, "▶") {
+			t.Error("expected cursor indicator (▶) in content")
+		}
+	})
+
+	t.Run("empty task list", func(t *testing.T) {
+		m := &Model{
+			width:      80,
+			taskItems:  nil,
+			taskCursor: 0,
+		}
+		content, _ := m.renderTasksContent()
+		if content != "" {
+			t.Errorf("expected empty content, got %q", content)
 		}
 	})
 }

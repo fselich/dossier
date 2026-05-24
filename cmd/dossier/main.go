@@ -32,7 +32,17 @@ func main() {
 		os.Exit(0)
 	}
 
-	cfg := openspec.LoadConfig()
+	cwd, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "error: cannot determine working directory:", err)
+		os.Exit(1)
+	}
+
+	cfg, err := openspec.LoadConfigFrom(cwd)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "error: loading config:", err)
+		os.Exit(1)
+	}
 
 	if len(os.Args) > 1 {
 		project, err = openspec.LoadFromPath(os.Args[1])
@@ -40,14 +50,14 @@ func main() {
 			fmt.Fprintln(os.Stderr, "error:", err)
 			os.Exit(1)
 		}
-		model = ui.NewSinglePath(project, cfg)
+		model = ui.NewSinglePath(project, cfg, os.Args[1])
 	} else {
-		project, err = openspec.Load()
+		project, err = openspec.LoadFrom(cwd)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
-		model = ui.New(project, cfg)
+		model = ui.New(project, cfg, cwd)
 	}
 
 	p := tea.NewProgram(model, tea.WithAltScreen(), tea.WithMouseCellMotion())
