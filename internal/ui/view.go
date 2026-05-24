@@ -212,12 +212,12 @@ func (m *Model) renderHelpBar() string {
 		return helpStyle.Render("j/k: scroll  Esc: index  q: quit")
 	}
 	if m.mode == ModeViewingArchive {
-		return helpStyle.Render("1-4: artifact  j/k: scroll  a/Esc: index  q: quit")
+		return helpStyle.Render("1-4/Tab: artifact  j/k: scroll  a/Esc: index  q: quit")
 	}
 	if m.tab == TabTasks {
-		return helpStyle.Render("h/l: change  1-4: artifact  j/k: navigate  Space: toggle  e: edit  i: info  Esc: index  q: quit")
+		return helpStyle.Render("h/l: change  1-4/Tab: artifact  j/k: navigate  Space: toggle  e: edit  i: info  Esc: index  q: quit")
 	}
-	return helpStyle.Render("h/l: change  1-4: artifact  j/k: scroll  e: edit  i: info  Esc: index  q: quit")
+	return helpStyle.Render("h/l: change  1-4/Tab: artifact  j/k: scroll  e: edit  i: info  Esc: index  q: quit")
 }
 
 func (m *Model) emptyView() string {

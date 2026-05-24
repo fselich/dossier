@@ -184,6 +184,17 @@ func (m *Model) defaultTab() Tab {
 	return TabProposal
 }
 
+func (m *Model) nextAvailableTab(current Tab, delta int) Tab {
+	next := current
+	for i := 0; i < int(tabCount); i++ {
+		next = Tab((int(next) + delta + int(tabCount)) % int(tabCount))
+		if m.tabAvailable(next) {
+			return next
+		}
+	}
+	return current
+}
+
 func (m *Model) artifactPath() string {
 	ch := m.current()
 	if ch == nil {

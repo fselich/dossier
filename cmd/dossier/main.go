@@ -9,12 +9,19 @@ import (
 	"github.com/fselich/dossier/internal/ui"
 )
 
+var version string
+
 func main() {
 	var (
 		project *openspec.Project
 		err     error
 		model   ui.Model
 	)
+
+	if len(os.Args) > 1 && (os.Args[1] == "--version" || os.Args[1] == "-v") {
+		fmt.Println("dossier", version)
+		os.Exit(0)
+	}
 
 	if len(os.Args) > 1 && (os.Args[1] == "--help" || os.Args[1] == "-h") {
 		fmt.Println("Usage: dossier [path]")
@@ -43,7 +50,7 @@ func main() {
 		model = ui.New(project, cfg)
 	}
 
-	p := tea.NewProgram(model, tea.WithAltScreen())
+	p := tea.NewProgram(model, tea.WithAltScreen(), tea.WithMouseCellMotion())
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)

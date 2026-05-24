@@ -97,6 +97,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.errMsg = ""
 		return m, nil
 
+	case tea.MouseMsg:
+		return m.handleMouse(msg)
+
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "q", "ctrl+c":
@@ -266,6 +269,25 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.tab = TabTasks
 				m.vp.Height = m.contentHeight()
 				return m, m.loadViewport()
+			}
+
+		case "tab":
+			if m.mode == ModeNormal || m.mode == ModeViewingArchive {
+				nxt := m.nextAvailableTab(m.tab, 1)
+				if nxt != m.tab {
+					m.tab = nxt
+					m.vp.Height = m.contentHeight()
+					return m, m.loadViewport()
+				}
+			}
+		case "shift+tab":
+			if m.mode == ModeNormal || m.mode == ModeViewingArchive {
+				prv := m.nextAvailableTab(m.tab, -1)
+				if prv != m.tab {
+					m.tab = prv
+					m.vp.Height = m.contentHeight()
+					return m, m.loadViewport()
+				}
 			}
 
 		case "j", "down":
