@@ -13,7 +13,7 @@
 
 ### Changed
 - Progress bar at 100% completion now renders in cyan instead of green. Cyan is like light blue, in case I forget.
-- Goreleaser releases are now created as drafts with changelog auto-generation disabled. Boring.
+- Goreleaser releases are now fully automated (no more drafts). Boring.
 - Help bar updated to include `Tab` and mouse shortcuts.
 
 ### Internal

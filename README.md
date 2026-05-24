@@ -25,7 +25,7 @@ A keyboard-driven terminal UI for reading and navigating [OpenSpec](https://gith
 
 ## Installation
 
-**Requirements:** Go 1.25 or later, terminal with ANSI color support.
+**Requirements:** terminal with ANSI color support. Go 1.25 or later if building from source.
 
 ```bash
 # Homebrew

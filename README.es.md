@@ -25,7 +25,7 @@ Interfaz de terminal controlada por teclado para leer y navegar artefactos de pr
 
 ## Instalación
 
-**Requisitos:** Go 1.25 o posterior, terminal con soporte de color ANSI.
+**Requisitos:** terminal con soporte de color ANSI. Go 1.25 o posterior si compilas desde el código fuente.
 
 ```bash
 # Homebrew

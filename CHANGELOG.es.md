@@ -13,7 +13,7 @@
 
 ### Cambiado
 - La barra de progreso al 100% se muestra en cyan en lugar de verde. Cyan es como azul clarito, por si se me olvida.
-- Las releases de goreleaser ahora se crean como borrador y con el changelog automático desactivado. Aburrido.
+- Las releases de goreleaser ahora son totalmente automáticas (sin borradores). Aburrido.
 - La barra de ayuda incluye los atajos `Tab` y de ratón.
 
 ### Interno
