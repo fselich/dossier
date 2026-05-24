@@ -32,6 +32,7 @@ archives:
       - LICENSE
       - README.md
       - README.es.md
+      - CHANGELOG.md
     wrap_in_directory: false
 
 checksum:
