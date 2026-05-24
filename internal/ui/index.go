@@ -16,9 +16,18 @@ func (m *Model) handleTick() tea.Cmd {
 	}
 
 	if m.mode == ModeIndex {
-		diskChanges := openspec.ListChangeNames()
-		diskArchives := openspec.ListArchiveNames()
-		diskSpecs := openspec.ListSpecNames()
+		diskChanges, err := openspec.ListChangeNamesFrom(m.root)
+		if err != nil {
+			return nil
+		}
+		diskArchives, err := openspec.ListArchiveNamesFrom(m.root)
+		if err != nil {
+			return nil
+		}
+		diskSpecs, err := openspec.ListSpecNamesFrom(m.root)
+		if err != nil {
+			return nil
+		}
 
 		archiveNames := make([]string, len(m.archiveChanges))
 		for i, ch := range m.archiveChanges {
@@ -35,11 +44,11 @@ func (m *Model) handleTick() tea.Cmd {
 			return nil
 		}
 
-		if p, err := openspec.Load(); err == nil {
+		if p, err := openspec.LoadFrom(m.root); err == nil {
 			m.project = p
 		}
-		m.archiveChanges = openspec.ListArchiveChanges()
-		m.projectSpecs = openspec.LoadProjectSpecs()
+		m.archiveChanges, _ = openspec.ListArchiveChangesFrom(m.root)
+		m.projectSpecs, _ = openspec.LoadProjectSpecsFrom(m.root)
 		m.expandedSpecs = make(map[int]bool)
 		m.buildIndexItems()
 		if m.indexCursor >= len(m.indexItems) {
@@ -48,15 +57,17 @@ func (m *Model) handleTick() tea.Cmd {
 		m.refreshIndexViewport()
 		return nil
 	}
-	// Detect change list additions/removals. Skipped in single-path mode.
 	if !m.singlePath {
-		diskNames := openspec.ListChangeNames()
+		diskNames, err := openspec.ListChangeNamesFrom(m.root)
+		if err != nil {
+			return nil
+		}
 		if !sameNames(m.project.Changes, diskNames) {
 			currentName := ""
 			if ch := m.current(); ch != nil {
 				currentName = ch.Name
 			}
-			if p, err := openspec.Load(); err == nil {
+			if p, err := openspec.LoadFrom(m.root); err == nil {
 				m.project = p
 				m.changeIdx = 0
 				for i, ch := range p.Changes {
@@ -82,7 +93,6 @@ func (m *Model) handleTick() tea.Cmd {
 	}
 	fresh := openspec.ReloadChange(*ch)
 
-	// tasks.md: presence or content change → full re-parse with cursor restoration
 	if fresh.Tasks.Present != ch.Tasks.Present || fresh.Tasks.Content != ch.Tasks.Content {
 		var cursorText string
 		if m.taskCursor < len(m.taskItems) && m.taskItems[m.taskCursor].Kind == openspec.KindTask {
@@ -96,7 +106,6 @@ func (m *Model) handleTick() tea.Cmd {
 		}
 	}
 
-	// markdown artifacts: presence or content change → update + invalidate render cache
 	viewportDirty := false
 	if fresh.Proposal.Present != ch.Proposal.Present || fresh.Proposal.Content != ch.Proposal.Content {
 		m.project.Changes[m.changeIdx].Proposal = fresh.Proposal
@@ -131,9 +140,9 @@ func (m *Model) handleTick() tea.Cmd {
 
 func (m *Model) enterIndex() {
 	if len(m.archiveChanges) == 0 {
-		m.archiveChanges = openspec.ListArchiveChanges()
+		m.archiveChanges, _ = openspec.ListArchiveChangesFrom(m.root)
 	}
-	m.projectSpecs = openspec.LoadProjectSpecs()
+	m.projectSpecs, _ = openspec.LoadProjectSpecsFrom(m.root)
 	m.expandedSpecs = make(map[int]bool)
 	m.buildIndexItems()
 	m.indexCursor = 0

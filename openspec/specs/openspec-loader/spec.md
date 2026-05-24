@@ -7,7 +7,7 @@ Loads and exposes the openspec project structure from the working directory: act
 
 
 ### Requirement: Descubrir openspec desde CWD
-The loader SHALL look for the `openspec/` directory relative to the current working directory on startup. If it does not exist, it SHALL terminate with a clear error message.
+The loader SHALL look for the `openspec/` directory relative to the current working directory on startup. The `Load()` function SHALL delegate to `LoadFrom(os.Getwd())` internally. If the directory does not exist or if `os.Getwd()` fails, the loader SHALL return an error.
 
 #### Scenario: openspec presente
 - **WHEN** `dossier` is run in a directory that contains `openspec/`
@@ -15,7 +15,7 @@ The loader SHALL look for the `openspec/` directory relative to the current work
 
 #### Scenario: openspec ausente
 - **WHEN** `dossier` is run in a directory without `openspec/`
-- **THEN** the program terminates with the message `"No openspec/ directory found in current directory"`
+- **THEN** the program terminates with an error message indicating the openspec directory was not found
 
 ### Requirement: Listar changes activos
 The loader SHALL consider as active changes all direct subdirectories of `openspec/changes/` except `archive/`. It SHALL ignore any loose files at that level.
@@ -73,23 +73,63 @@ The loader SHALL expose a function that, given an already-loaded `Change`, rerea
 - **THEN** the function returns a `Change` with the same content as the original
 
 ### Requirement: Listar nombres de changes archivados
-The loader SHALL expose a `ListArchiveNames()` function that returns only the names of the subdirectories of `openspec/changes/archive/`, sorted from most recent to oldest (descending alphabetical order by directory name), without reading any files inside them. If the directory does not exist or is empty, it SHALL return an empty list without error.
+The loader SHALL expose a `ListArchiveNames()` function that returns the names and an error. It SHALL return only the names of the subdirectories of `openspec/changes/archive/`, sorted from most recent to oldest, without reading any files inside them. If the directory does not exist, it SHALL return an empty list and nil error. If a read error occurs, the error SHALL be propagated.
 
 #### Scenario: Orden descendente garantizado
 - **WHEN** `openspec/changes/archive/` contains directories with different date prefixes
-- **THEN** `ListArchiveNames()` returns the names in descending order, matching the order of `ListArchiveChanges()`
+- **THEN** `ListArchiveNames()` returns the names in descending order and nil error
 
 #### Scenario: Directorio archive ausente
 - **WHEN** `openspec/changes/archive/` does not exist
-- **THEN** `ListArchiveNames()` returns an empty list without error
+- **THEN** `ListArchiveNames()` returns an empty list and nil error
 
 ### Requirement: Listar nombres de specs del proyecto
-The loader SHALL expose a `ListSpecNames()` function that returns only the names of the subdirectories of `openspec/specs/`, sorted alphabetically, without reading any files inside them. If the directory does not exist or is empty, it SHALL return an empty list without error.
+The loader SHALL expose a `ListSpecNames()` function that returns the names and an error. It SHALL return only the names of the subdirectories of `openspec/specs/`, sorted alphabetically, without reading any files inside them. If the directory does not exist, it SHALL return nil and nil error. If a read error occurs for another reason, the error SHALL be propagated.
 
 #### Scenario: Orden alfabético garantizado
 - **WHEN** `openspec/specs/` contains three subdirectories in non-alphabetical creation order
-- **THEN** `ListSpecNames()` returns the names in ascending alphabetical order
+- **THEN** `ListSpecNames()` returns the names in ascending alphabetical order and nil error
 
 #### Scenario: Directorio specs ausente
 - **WHEN** `openspec/specs/` does not exist
-- **THEN** `ListSpecNames()` returns an empty list without error
+- **THEN** `ListSpecNames()` returns nil and nil error
+
+### Requirement: LoadConfig returns error on failure
+`LoadConfig()` SHALL return `(ProjectConfig, error)`. If the config file does not exist, it SHALL return an empty config and nil error. If the YAML is malformed, it SHALL return an error.
+
+#### Scenario: Config file with valid YAML
+- **WHEN** `LoadConfig()` is called and `openspec/config.yaml` contains valid YAML
+- **THEN** the function returns the parsed `ProjectConfig` and nil error
+
+#### Scenario: Config file with invalid YAML
+- **WHEN** `LoadConfig()` is called and `openspec/config.yaml` contains malformed YAML
+- **THEN** the function returns an empty `ProjectConfig` and a non-nil error
+
+### Requirement: LoadProjectSpecs returns error on failure
+`LoadProjectSpecs()` SHALL return `([]ProjectSpec, error)`. If the `openspec/specs/` directory does not exist, it SHALL return nil and nil error. If a read error occurs for another reason, the error SHALL be propagated.
+
+#### Scenario: Specs directory readable
+- **WHEN** `LoadProjectSpecs()` is called and `openspec/specs/` exists with subdirectories
+- **THEN** the function returns the list of specs and nil error
+
+#### Scenario: Specs directory missing
+- **WHEN** `LoadProjectSpecs()` is called and `openspec/specs/` does not exist
+- **THEN** the function returns nil and nil error
+
+### Requirement: ListArchiveChanges returns error on failure
+`ListArchiveChanges()` SHALL return `([]Change, error)`. If the archive directory does not exist, it SHALL return nil and nil error. If a read error occurs, the error SHALL be propagated.
+
+#### Scenario: Archive directory exists
+- **WHEN** `ListArchiveChanges()` is called and `openspec/changes/archive/` exists
+- **THEN** the function returns the list and nil error
+
+### Requirement: ListChangeNames returns error on failure
+`ListChangeNames()` SHALL return `([]string, error)`. If the changes directory does not exist, it SHALL return nil and nil error. If a read error occurs for another reason, the error SHALL be propagated.
+
+#### Scenario: Changes directory exists with entries
+- **WHEN** `ListChangeNames()` is called and `openspec/changes/` contains active change subdirectories
+- **THEN** the function returns the sorted list and nil error
+
+#### Scenario: Changes directory missing
+- **WHEN** `ListChangeNames()` is called and `openspec/changes/` does not exist
+- **THEN** the function returns nil and nil error
