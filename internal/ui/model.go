@@ -1,13 +1,13 @@
 package ui
 
 import (
+	"image/color"
 	"os"
 	"path/filepath"
 	"time"
 
-	"github.com/charmbracelet/bubbles/viewport"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/viewport"
+	tea "charm.land/bubbletea/v2"
 	"github.com/fselich/dossier/internal/openspec"
 )
 
@@ -71,7 +71,7 @@ type indexItem struct {
 }
 
 type Theme struct {
-	ViewBg lipgloss.TerminalColor
+	ViewBg color.Color
 }
 
 type Model struct {
@@ -121,7 +121,7 @@ func New(project *openspec.Project, cfg openspec.ProjectConfig, root string) Mod
 		project:       project,
 		renderCache:   make(map[Tab]string),
 		projectConfig: cfg,
-		theme:         Theme{ViewBg: lipgloss.NoColor{}},
+		theme:         Theme{},
 	}
 	if len(project.Changes) > 0 {
 		m.tab = m.defaultTab()
@@ -138,6 +138,29 @@ func NewSinglePath(project *openspec.Project, cfg openspec.ProjectConfig, root s
 
 func (m Model) Init() tea.Cmd {
 	return tea.Tick(500*time.Millisecond, func(t time.Time) tea.Msg { return tickMsg(t) })
+}
+
+func (m Model) View() tea.View {
+	if !m.vpReady {
+		return tea.NewView("")
+	}
+
+	var content string
+	if m.mode == ModeViewingConfig {
+		content = m.viewConfigContent()
+	} else if m.mode == ModeIndex || m.mode == ModeViewingSpec {
+		content = m.viewIndexContent()
+	} else if len(m.project.Changes) == 0 && m.mode == ModeNormal {
+		content = m.emptyViewContent()
+	} else {
+		content = m.mainViewContent()
+	}
+
+	v := tea.NewView(content)
+	v.AltScreen = true
+	v.MouseMode = tea.MouseModeCellMotion
+	v.BackgroundColor = m.theme.ViewBg
+	return v
 }
 
 // ── helpers ───────────────────────────────────────────────────────────────────

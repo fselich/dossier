@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/fselich/dossier/internal/openspec"
 )
 
@@ -147,7 +147,7 @@ func (m *Model) enterIndex() {
 	m.buildIndexItems()
 	m.indexCursor = 0
 	m.mode = ModeIndex
-	m.vp.Height = m.contentHeight()
+	m.vp.SetHeight(m.contentHeight())
 	m.refreshIndexViewport()
 }
 
@@ -194,10 +194,10 @@ func (m *Model) buildIndexItems() {
 func (m *Model) refreshIndexViewport() {
 	content, cursorLine := m.renderIndexContent()
 	m.vp.SetContent(content)
-	if cursorLine < m.vp.YOffset {
+	if cursorLine < m.vp.YOffset() {
 		m.vp.SetYOffset(cursorLine)
-	} else if cursorLine >= m.vp.YOffset+m.vp.Height {
-		m.vp.SetYOffset(cursorLine - m.vp.Height + 1)
+	} else if cursorLine >= m.vp.YOffset()+m.vp.Height() {
+		m.vp.SetYOffset(cursorLine - m.vp.Height() + 1)
 	}
 }
 

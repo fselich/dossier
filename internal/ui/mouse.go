@@ -1,10 +1,10 @@
 package ui
 
-import tea "github.com/charmbracelet/bubbletea"
+import tea "charm.land/bubbletea/v2"
 
-func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleMouseWheel(msg tea.MouseWheelMsg) (tea.Model, tea.Cmd) {
 	switch msg.Button {
-	case tea.MouseButtonWheelUp:
+	case tea.MouseWheelUp:
 		if m.mode == ModeIndex {
 			if m.indexCursor > 0 {
 				m.indexCursor--
@@ -17,9 +17,9 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			m.refreshTasksViewport()
 			return m, nil
 		}
-		m.vp.LineUp(3)
+		m.vp.ScrollUp(3)
 		return m, nil
-	case tea.MouseButtonWheelDown:
+	case tea.MouseWheelDown:
 		if m.mode == ModeIndex {
 			if m.indexCursor < len(m.indexItems)-1 {
 				m.indexCursor++
@@ -32,11 +32,14 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			m.refreshTasksViewport()
 			return m, nil
 		}
-		m.vp.LineDown(3)
+		m.vp.ScrollDown(3)
 		return m, nil
 	}
+	return m, nil
+}
 
-	if msg.Action != tea.MouseActionPress || msg.Button != tea.MouseButtonLeft {
+func (m Model) handleMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) {
+	if msg.Button != tea.MouseLeft {
 		return m, nil
 	}
 
@@ -67,7 +70,7 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 					m.specIdx = 0
 				}
 			}
-			m.vp.Height = m.contentHeight()
+			m.vp.SetHeight(m.contentHeight())
 			return m, m.loadViewport()
 		}
 		x += w + 1

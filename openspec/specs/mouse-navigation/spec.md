@@ -7,11 +7,15 @@ Mouse input handling for the TUI: click to select tabs, wheel to scroll viewport
 
 ### Requirement: Mouse event capture
 
-The TUI SHALL enable mouse event capture via `tea.WithMouseCellMotion()` so that `tea.MouseMsg` events are delivered to the `Update` function.
+The TUI SHALL enable mouse event capture declaratively via `tea.View.MouseMode = tea.MouseModeCellMotion` instead of the imperative `tea.WithMouseCellMotion()` program option. Mouse events SHALL be delivered as `tea.MouseClickMsg`, `tea.MouseWheelMsg`, and `tea.MouseMotionMsg` instead of the unified `tea.MouseMsg`. Mouse tracking SHALL persist across external editor sessions because the mouse mode is re-declared on every frame.
 
 #### Scenario: Mouse events are received after startup
 - **WHEN** the TUI starts
-- **THEN** `tea.MouseMsg` messages for clicks, releases, and wheel events are delivered to `Update`
+- **THEN** `tea.MouseClickMsg` and `tea.MouseWheelMsg` messages are delivered to `Update`
+
+#### Scenario: Mouse tracking persists after external editor
+- **WHEN** the user opens an external editor and returns to the TUI
+- **THEN** mouse events continue to be received and handled correctly
 
 #### Scenario: Text selection bypasses mouse capture
 - **WHEN** the user holds Shift and clicks / drags

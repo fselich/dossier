@@ -6,18 +6,18 @@ import (
 	"strings"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/fselich/dossier/internal/openspec"
 )
 
 func (m *Model) refreshTasksViewport() {
 	content, cursorLine := m.renderTasksContent()
 	m.vp.SetContent(content)
-	if cursorLine < m.vp.YOffset {
+	if cursorLine < m.vp.YOffset() {
 		m.vp.SetYOffset(cursorLine)
-	} else if cursorLine >= m.vp.YOffset+m.vp.Height {
-		m.vp.SetYOffset(cursorLine - m.vp.Height + 1)
+	} else if cursorLine >= m.vp.YOffset()+m.vp.Height() {
+		m.vp.SetYOffset(cursorLine - m.vp.Height() + 1)
 	}
 }
 

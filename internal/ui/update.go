@@ -5,8 +5,8 @@ import (
 	"os/exec"
 	"time"
 
-	"github.com/charmbracelet/bubbles/viewport"
-	tea "github.com/charmbracelet/bubbletea"
+	"charm.land/bubbles/v2/viewport"
+	tea "charm.land/bubbletea/v2"
 	"github.com/fselich/dossier/internal/openspec"
 )
 
@@ -18,11 +18,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 		contentH := m.contentHeight()
 		if !m.vpReady {
-			m.vp = viewport.New(m.width-2, contentH)
+			m.vp = viewport.New(viewport.WithWidth(m.width-2), viewport.WithHeight(contentH))
 			m.vpReady = true
 		} else {
-			m.vp.Width = m.width - 2
-			m.vp.Height = contentH
+			m.vp.SetWidth(m.width - 2)
+			m.vp.SetHeight(contentH)
 		}
 		m.renderCache = make(map[Tab]string)
 		return m, m.loadViewport()
@@ -97,15 +97,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.errMsg = ""
 		return m, nil
 
-	case tea.MouseMsg:
-		return m.handleMouse(msg)
+	case tea.MouseWheelMsg:
+		return m.handleMouseWheel(msg)
 
-	case tea.KeyMsg:
+	case tea.MouseClickMsg:
+		return m.handleMouseClick(msg)
+
+	case tea.KeyPressMsg:
 		switch msg.String() {
 		case "q", "ctrl+c":
 			if m.mode == ModeViewingConfig {
 				m.mode = m.prevMode
-				m.vp.Height = m.contentHeight()
+				m.vp.SetHeight(m.contentHeight())
 				return m, m.loadViewport()
 			}
 			return m, tea.Quit
@@ -114,7 +117,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.mode == ModeIndex || m.mode == ModeNormal {
 				m.prevMode = m.mode
 				m.mode = ModeViewingConfig
-				m.vp.Height = m.contentHeight()
+				m.vp.SetHeight(m.contentHeight())
 				return m, m.loadViewport()
 			}
 
@@ -127,7 +130,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			switch m.mode {
 			case ModeViewingConfig:
 				m.mode = m.prevMode
-				m.vp.Height = m.contentHeight()
+				m.vp.SetHeight(m.contentHeight())
 				return m, m.loadViewport()
 			case ModeNormal, ModeViewingArchive:
 				m.enterIndex()
@@ -139,7 +142,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				wasFocusMode := m.specFocusMode
 				m.enterIndex()
 				if wasFocusMode && jumpTarget != "" {
-					// Expand the spec and place cursor on the requirement we were viewing.
 					m.expandedSpecs[specIdx] = true
 					m.buildIndexItems()
 					for j, it := range m.indexItems {
@@ -170,7 +172,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.mode = ModeNormal
 					m.tab = m.defaultTab()
 					m.loadTaskItems()
-					m.vp.Height = m.contentHeight()
+					m.vp.SetHeight(m.contentHeight())
 					return m, m.loadViewport()
 				}
 				if item.kind == indexKindSpec {
@@ -179,7 +181,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.specFocusMode = false
 					m.specReqCursor = 0
 					m.mode = ModeViewingSpec
-					m.vp.Height = m.contentHeight()
+					m.vp.SetHeight(m.contentHeight())
 					return m, m.loadViewport()
 				}
 				if item.kind == indexKindRequirement {
@@ -188,14 +190,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.specFocusMode = true
 					m.specReqCursor = item.reqIdx
 					m.mode = ModeViewingSpec
-					m.vp.Height = m.contentHeight()
+					m.vp.SetHeight(m.contentHeight())
 					return m, m.loadViewport()
 				}
-				// archived
 				m.archiveCursor = item.idx
 				m.tab = firstAvailableTab(m.archiveChanges[item.idx])
 				m.mode = ModeViewingArchive
-				m.vp.Height = m.contentHeight()
+				m.vp.SetHeight(m.contentHeight())
 				return m, m.loadViewport()
 			}
 
@@ -214,7 +215,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.loadTaskItems()
 				m.tab = m.defaultTab()
 				m.specIdx = 0
-				m.vp.Height = m.contentHeight()
+				m.vp.SetHeight(m.contentHeight())
 				return m, m.loadViewport()
 			}
 
@@ -233,20 +234,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.loadTaskItems()
 				m.tab = m.defaultTab()
 				m.specIdx = 0
-				m.vp.Height = m.contentHeight()
+				m.vp.SetHeight(m.contentHeight())
 				return m, m.loadViewport()
 			}
 
 		case "1":
 			if m.tabAvailable(TabProposal) {
 				m.tab = TabProposal
-				m.vp.Height = m.contentHeight()
+				m.vp.SetHeight(m.contentHeight())
 				return m, m.loadViewport()
 			}
 		case "2":
 			if m.tabAvailable(TabDesign) {
 				m.tab = TabDesign
-				m.vp.Height = m.contentHeight()
+				m.vp.SetHeight(m.contentHeight())
 				return m, m.loadViewport()
 			}
 		case "3":
@@ -261,13 +262,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.tab = TabSpecs
 					m.specIdx = 0
 				}
-				m.vp.Height = m.contentHeight()
+				m.vp.SetHeight(m.contentHeight())
 				return m, m.loadViewport()
 			}
 		case "4":
 			if m.mode != ModeIndex && m.tabAvailable(TabTasks) {
 				m.tab = TabTasks
-				m.vp.Height = m.contentHeight()
+				m.vp.SetHeight(m.contentHeight())
 				return m, m.loadViewport()
 			}
 
@@ -276,7 +277,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				nxt := m.nextAvailableTab(m.tab, 1)
 				if nxt != m.tab {
 					m.tab = nxt
-					m.vp.Height = m.contentHeight()
+					m.vp.SetHeight(m.contentHeight())
 					return m, m.loadViewport()
 				}
 			}
@@ -285,7 +286,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				prv := m.nextAvailableTab(m.tab, -1)
 				if prv != m.tab {
 					m.tab = prv
-					m.vp.Height = m.contentHeight()
+					m.vp.SetHeight(m.contentHeight())
 					return m, m.loadViewport()
 				}
 			}
@@ -302,7 +303,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.moveCursorDown()
 					m.refreshTasksViewport()
 				} else {
-					m.vp.LineDown(1)
+					m.vp.ScrollDown(1)
 				}
 			}
 
@@ -318,11 +319,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.moveCursorUp()
 					m.refreshTasksViewport()
 				} else {
-					m.vp.LineUp(1)
+					m.vp.ScrollUp(1)
 				}
 			}
 
-		case " ":
+		case "space":
 			if m.mode == ModeNormal && m.tab == TabTasks {
 				return m, m.doToggle()
 			}
@@ -332,7 +333,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					specIdx := item.idx
 					m.expandedSpecs[specIdx] = !m.expandedSpecs[specIdx]
 					m.buildIndexItems()
-					// Restore cursor to the spec item (it may have shifted).
 					m.indexCursor = 0
 					for i, it := range m.indexItems {
 						if it.kind == indexKindSpec && it.idx == specIdx {
@@ -345,7 +345,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 					m.refreshIndexViewport()
 				}
-				// Space on a requirement item: no-op.
 			}
 
 		case "s":

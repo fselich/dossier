@@ -2,72 +2,14 @@ package ui
 
 import (
 	"fmt"
-	"strconv"
 	"sort"
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 	"github.com/fselich/dossier/internal/openspec"
 )
 
-func (m *Model) renderWithBackground(content string) string {
-	if _, ok := m.theme.ViewBg.(lipgloss.NoColor); ok {
-		return content
-	}
-	if m.theme.ViewBg == nil {
-		return content
-	}
-
-	bgStyle := lipgloss.NewStyle().
-		Background(m.theme.ViewBg).
-		Width(m.width).
-		Height(m.height)
-
-	wrapped := bgStyle.Render(content)
-
-	restore := bgSGRRestore(m.theme.ViewBg)
-	if restore == "" {
-		return wrapped
-	}
-
-	return strings.ReplaceAll(wrapped, "\033[0m", "\033["+restore+"m")
-}
-
-func bgSGRRestore(c lipgloss.TerminalColor) string {
-	switch v := c.(type) {
-	case lipgloss.NoColor:
-		return ""
-	case lipgloss.Color:
-		s := string(v)
-		if s == "" {
-			return ""
-		}
-		if _, err := strconv.Atoi(s); err == nil {
-			return "0;48;5;" + s
-		}
-		if strings.HasPrefix(s, "#") && len(s) == 7 {
-			r, _ := strconv.ParseInt(s[1:3], 16, 32)
-			g, _ := strconv.ParseInt(s[3:5], 16, 32)
-			b, _ := strconv.ParseInt(s[5:7], 16, 32)
-			return fmt.Sprintf("0;48;2;%d;%d;%d", r, g, b)
-		}
-	}
-	return ""
-}
-
-func (m Model) View() string {
-	if !m.vpReady {
-		return ""
-	}
-	if m.mode == ModeViewingConfig {
-		return m.viewConfig()
-	}
-	if m.mode == ModeIndex || m.mode == ModeViewingSpec {
-		return m.viewIndex()
-	}
-	if len(m.project.Changes) == 0 && m.mode == ModeNormal {
-		return m.renderWithBackground(m.emptyView())
-	}
+func (m *Model) mainViewContent() string {
 	rows := []string{
 		m.boxTop(),
 		m.addBorderSides(m.renderHeader()),
@@ -83,10 +25,10 @@ func (m Model) View() string {
 		m.addBorderSides(m.renderHelpBar()),
 		m.boxBottom(),
 	)
-	return m.renderWithBackground(strings.Join(rows, "\n"))
+	return strings.Join(rows, "\n")
 }
 
-func (m *Model) viewIndex() string {
+func (m *Model) viewIndexContent() string {
 	rows := []string{
 		m.boxTop(),
 		m.addBorderSides(m.renderHeader()),
@@ -96,7 +38,30 @@ func (m *Model) viewIndex() string {
 		m.addBorderSides(m.renderHelpBar()),
 		m.boxBottom(),
 	}
-	return m.renderWithBackground(strings.Join(rows, "\n"))
+	return strings.Join(rows, "\n")
+}
+
+func (m *Model) viewConfigContent() string {
+	rows := []string{
+		m.boxTop(),
+		m.addBorderSides(m.renderHeader()),
+		m.boxInnerSep(),
+		m.addBorderSides(m.vp.View()),
+		m.boxInnerSep(),
+		m.addBorderSides(m.renderHelpBar()),
+		m.boxBottom(),
+	}
+	return strings.Join(rows, "\n")
+}
+
+func (m *Model) emptyViewContent() string {
+	return m.boxTop() + "\n" +
+		m.addBorderSides(headerStyle.Render(m.project.Name)+
+			"\n\n\n  No active changes. Create one with /opsx:propose\n"+
+			helpStyle.Render("\n  a/Esc: index  q: quit")) + "\n" +
+		m.boxInnerSep() + "\n" +
+		m.addBorderSides(m.renderHelpBar()) + "\n" +
+		m.boxBottom()
 }
 
 func (m *Model) renderHeader() string {
@@ -151,7 +116,6 @@ func (m *Model) renderTabBar() string {
 	}
 	tabs := strings.Join(parts, " ")
 
-	// Progress bar right-aligned on the same line as the tabs
 	taskItems := m.taskItems
 	if m.mode == ModeViewingArchive {
 		if ch := m.currentArchive(); ch != nil && ch.Tasks.Present {
@@ -253,7 +217,7 @@ func (m *Model) renderHelpBar() string {
 	}
 	if m.mode == ModeViewingSpec {
 		if m.specFocusMode {
-			return helpStyle.Render("h/l: req anterior/siguiente  j/k: scroll  Esc: índice  q: quit")
+			return helpStyle.Render("h/l: req anterior/siguiente  j/k: scroll  Esc: index  q: quit")
 		}
 		return helpStyle.Render("j/k: scroll  Esc: index  q: quit")
 	}
@@ -264,25 +228,6 @@ func (m *Model) renderHelpBar() string {
 		return helpStyle.Render("h/l: change  1-4/Tab: artifact  j/k: navigate  Space: toggle  e: edit  i: info  Esc: index  q: quit")
 	}
 	return helpStyle.Render("h/l: change  1-4/Tab: artifact  j/k: scroll  e: edit  i: info  Esc: index  q: quit")
-}
-
-func (m *Model) emptyView() string {
-	return headerStyle.Render(m.project.Name) +
-		"\n\n\n  No active changes. Create one with /opsx:propose\n" +
-		helpStyle.Render("\n  a/Esc: index  q: quit")
-}
-
-func (m *Model) viewConfig() string {
-	rows := []string{
-		m.boxTop(),
-		m.addBorderSides(m.renderHeader()),
-		m.boxInnerSep(),
-		m.addBorderSides(m.vp.View()),
-		m.boxInnerSep(),
-		m.addBorderSides(m.renderHelpBar()),
-		m.boxBottom(),
-	}
-	return m.renderWithBackground(strings.Join(rows, "\n"))
 }
 
 func configToMarkdown(cfg openspec.ProjectConfig) string {
