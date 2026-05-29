@@ -2,6 +2,16 @@
 
 # Changelog
 
+## v0.12.0
+
+### Arreglado
+- Si arrancamos dossier cuando no hay cambios pendientes, te muestra el índice de specs y cambios archivados. 
+- Las actualizaciones de contenido de tareas dentro de cambios existentes ahora provocan una actualización en vivo de la lista de índices, en lugar de ignorarlas silenciosamente.
+- El placeholder de carga (`"Loading..."` / `"Cargando..."`) fue eliminado. El markdown crudo se muestra de inmediato mientras la versión con estilo se renderiza en segundo plano. Adios al modo involuntario para epilépticos.
+
+### Cambiado
+- La lista de cambios en la vista de índice ahora se ordena por fecha de creación (descendente). Antes se ordenaban con el método slsdlp. 
+
 ## v0.11.0
 
 ### Arreglado

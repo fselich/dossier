@@ -2,6 +2,16 @@
 
 # Changelog
 
+## v0.12.0
+
+### Fixed
+- Starting dossier with no pending changes now shows the index view with specs and archived changes instead of a blank screen.
+- Task content updates inside existing changes now trigger a live refresh of the index list instead of silently ignoring them.
+- The loading placeholder (`"Loading..."` / `"Cargando..."`) was removed. Raw markdown is shown immediately while the styled version renders in the background. Goodbye to the involuntary epilepsy mode.
+
+### Changed
+- Change list in the index view is now sorted by `created` date (descending). Before, they were sorted by whatever the filesystem felt like.
+
 ## v0.11.0
 
 ### Fixed
