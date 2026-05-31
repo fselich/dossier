@@ -2,6 +2,11 @@
 
 # Changelog
 
+## v0.14.1
+
+### Fixed
+- Done-task code spans in the task list no longer show the first letter in a different color. Lipgloss renders underlined text character by character, resetting the foreground between them. The fix combines underline with the foreground color so each character inherits both.
+
 ## v0.14.0
 
 ### Added

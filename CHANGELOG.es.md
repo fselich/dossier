@@ -2,6 +2,11 @@
 
 # Changelog
 
+## v0.14.1
+
+### Arreglado
+- Los spans de código en tareas completadas ya no muestran la primera letra de un color diferente. Lipgloss renderiza el texto subrayado carácter por carácter, reseteando el foreground entre ellos. La solución combina el subrayado con el color de primer plano para que cada carácter herede ambos.
+
 ## v0.14.0
 
 ### Añadido
