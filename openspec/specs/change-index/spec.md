@@ -124,3 +124,56 @@ Active changes in the index SHALL be displayed in creation date order, newest fi
 #### Scenario: Cambio sin fecha aparece al final
 - **WHEN** an active change has no `created` date
 - **THEN** it appears after all dated changes in the "Active Changes" section
+
+### Requirement: Filtrar el índice con /
+While the mode is `ModeIndex`, pressing `/` SHALL enter a filter typing state where the help bar is replaced by a prompt showing `/` followed by the current query text. While in this typing state, every printable character typed SHALL be appended to the query, every `Backspace` SHALL remove the last character, and the index items SHALL be filtered in real-time using case-insensitive substring matching against the change name (active and archived), the spec name, and the requirement name. Pressing `Enter` SHALL confirm the query (filter stays applied, help bar returns with `[/query]` indicator). Pressing `Esc` while typing SHALL cancel the editing and restore the previous filter state. While a filter is applied but not typing, `Esc` SHALL clear it.
+
+#### Scenario: Pressing / enters filter typing state
+- **WHEN** the mode is `ModeIndex` and the user presses `/`
+- **THEN** the help bar shows `/` with a visible input cursor and no filtering occurs yet
+
+#### Scenario: Typing filters items in real-time
+- **WHEN** the mode is `ModeIndex`, the user presses `/`, then types "foo"
+- **THEN** within the same frame, only items whose name contains "foo" (case-insensitive) remain visible, and items without "foo" are hidden
+
+#### Scenario: Enter confirms filter, Esc during typing cancels
+- **WHEN** the mode is `ModeIndex`, the user types "bar" after `/` and presses `Enter`
+- **THEN** the filter remains active with `[/bar]` indicator
+
+#### Scenario: Esc with filter active clears it
+- **WHEN** the mode is `ModeIndex`, a filter "foo" is active, and the user presses `Esc`
+- **THEN** the filter is cleared and all items are shown
+
+#### Scenario: Backspace during typing removes last character
+- **WHEN** the mode is `ModeIndex`, the user types "foobar" after `/`, then presses `Backspace` twice
+- **THEN** the query becomes "foob" and the filter updates accordingly
+
+#### Scenario: / reopens editing with pre-filled query
+- **WHEN** the mode is `ModeIndex`, a filter "foo" is active, and the user presses `/`
+- **THEN** the filter typing state opens with the query pre-filled as "foo"
+
+#### Scenario: Case-insensitive matching
+- **WHEN** the mode is `ModeIndex`, a change named "MyFeature" exists, and the user types `/myfeature`
+- **THEN** "MyFeature" is shown as a matching item
+
+### Requirement: Secciones sin coincidencias muestran mensaje
+When a filter is active and a section has no items matching the filter, that section SHALL display "No items match '<query>'" in help style. Sections that have no items without a filter SHALL keep their existing empty messages.
+
+#### Scenario: Sección activa sin match muestra mensaje
+- **WHEN** the mode is `ModeIndex`, a filter is active, and no active change matches it
+- **THEN** the Active Changes section shows "No items match '<query>'" instead of the list
+
+#### Scenario: Otras secciones con matches aún se muestran
+- **WHEN** the mode is `ModeIndex`, a filter matches some specs but no active changes and no archived changes
+- **THEN** the Active Changes and Archived Changes sections show the no-match message, while Specifications shows matching specs
+
+### Requirement: Cursor preservado al filtrar
+When a filter is applied or changed, the cursor SHALL be preserved on the same logical item if it still matches. If it no longer matches, the cursor SHALL move to the first item in the filtered list. If no items match, the cursor SHALL be set to 0.
+
+#### Scenario: Cursor stays on same item when it still matches
+- **WHEN** the cursor is on "data-export" and the user types `/data`
+- **THEN** the cursor remains on "data-export" in the filtered list
+
+#### Scenario: Cursor moves to first item when current item is filtered out
+- **WHEN** the cursor is on "auth" and the user types `/data`
+- **THEN** the cursor moves to the first matching item
