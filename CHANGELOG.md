@@ -2,6 +2,11 @@
 
 # Changelog
 
+## v0.14.0
+
+### Added
+- Press `/` in the index view to filter changes, specs, and archived items by name in real-time. Type to narrow down, `Enter` to lock the filter, `Esc` to clear it. A search box, basically.
+
 ## v0.13.0
 
 ### Internal

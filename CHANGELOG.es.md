@@ -2,6 +2,11 @@
 
 # Changelog
 
+## v0.14.0
+
+### Añadido
+- Pulsa `/` en la vista de índice para filtrar cambios, specs y archivados por nombre en tiempo real. Escribe para acotar, `Enter` para fijar el filtro, `Esc` para limpiarlo. Un buscador de toda la vida, vaya. 
+
 ## v0.13.0
 
 ### Interno
