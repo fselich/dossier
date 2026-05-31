@@ -14,138 +14,133 @@ func (m *Model) handleTick() tea.Cmd {
 	if m.mode == ModeViewingArchive || m.mode == ModeViewingSpec {
 		return nil
 	}
-
 	if m.mode == ModeIndex {
-		diskChanges, err := openspec.ListChangeNamesFrom(m.root)
-		if err != nil {
-			return nil
-		}
-		diskArchives, err := openspec.ListArchiveNamesFrom(m.root)
-		if err != nil {
-			return nil
-		}
-		diskSpecs, err := openspec.ListSpecNamesFrom(m.root)
-		if err != nil {
-			return nil
-		}
-
-		archiveNames := make([]string, len(m.archiveChanges))
-		for i, ch := range m.archiveChanges {
-			archiveNames[i] = filepath.Base(ch.Path)
-		}
-		specNames := make([]string, len(m.projectSpecs))
-		for i, ps := range m.projectSpecs {
-			specNames[i] = ps.Name
-		}
-
-		if sameNames(m.project.Changes, diskChanges) &&
-			sameStrings(archiveNames, diskArchives) &&
-			sameStrings(specNames, diskSpecs) {
-			needsRefresh := false
-			for i := range m.project.Changes {
-				ch := &m.project.Changes[i]
-				fresh := openspec.ReloadChange(*ch)
-				if fresh.Tasks.Present != ch.Tasks.Present || fresh.Tasks.Content != ch.Tasks.Content {
-					ch.Tasks = fresh.Tasks
-					needsRefresh = true
-				}
-			}
-			if needsRefresh {
-				m.buildIndexItems()
-				if m.indexCursor >= len(m.indexItems) {
-					m.indexCursor = max(0, len(m.indexItems)-1)
-				}
-				m.refreshIndexViewport()
-			}
-			return nil
-		}
-
-		if p, err := openspec.LoadFrom(m.root); err == nil {
-			m.project = p
-		}
-		m.archiveChanges, _ = openspec.ListArchiveChangesFrom(m.root)
-		m.projectSpecs, _ = openspec.LoadProjectSpecsFrom(m.root)
-		m.expandedSpecs = make(map[int]bool)
-		m.buildIndexItems()
-		if m.indexCursor >= len(m.indexItems) {
-			m.indexCursor = max(0, len(m.indexItems)-1)
-		}
-		m.refreshIndexViewport()
-		return nil
+		return m.pollIndexMode()
 	}
 	if !m.singlePath {
-		diskNames, err := openspec.ListChangeNamesFrom(m.root)
-		if err != nil {
-			return nil
-		}
-		if !sameNames(m.project.Changes, diskNames) {
-			currentName := ""
-			if ch := m.current(); ch != nil {
-				currentName = ch.Name
-			}
-			if p, err := openspec.LoadFrom(m.root); err == nil {
-				m.project = p
-				m.changeIdx = 0
-				for i, ch := range p.Changes {
-					if ch.Name == currentName {
-						m.changeIdx = i
-						break
-					}
-				}
-				if len(p.Changes) == 0 {
-					return nil
-				}
-				m.renderCache = make(map[Tab]string)
-				m.tab = m.defaultTab()
-				m.loadTaskItems()
-				return m.loadViewport()
-			}
+		if cmd := m.pollNormalModeChanges(); cmd != nil {
+			return cmd
 		}
 	}
+	return m.pollNormalModeContent()
+}
 
+func (m *Model) pollIndexMode() tea.Cmd {
+	diskChanges, err := m.loader.ListChangeNamesFrom(m.root)
+	if err != nil {
+		return nil
+	}
+	diskArchives, err := m.loader.ListArchiveNamesFrom(m.root)
+	if err != nil {
+		return nil
+	}
+	diskSpecs, err := m.loader.ListSpecNamesFrom(m.root)
+	if err != nil {
+		return nil
+	}
+
+	archiveNames := make([]string, len(m.index.ArchiveChanges))
+	for i, ch := range m.index.ArchiveChanges {
+		archiveNames[i] = filepath.Base(ch.Path)
+	}
+	specNames := make([]string, len(m.projectSpecs))
+	for i, ps := range m.projectSpecs {
+		specNames[i] = ps.Name
+	}
+
+	if sameNames(m.project.Changes, diskChanges) &&
+		sameStrings(archiveNames, diskArchives) &&
+		sameStrings(specNames, diskSpecs) {
+		needsRefresh := false
+		for i := range m.project.Changes {
+			ch := &m.project.Changes[i]
+			fresh := m.loader.ReloadChange(*ch)
+			if fresh.Tasks.Present != ch.Tasks.Present || fresh.Tasks.Content != ch.Tasks.Content {
+				ch.Tasks = fresh.Tasks
+				needsRefresh = true
+			}
+		}
+		if needsRefresh {
+			m.buildIndexItems()
+			if m.index.Cursor >= len(m.index.Items) {
+				m.index.Cursor = max(0, len(m.index.Items)-1)
+			}
+			m.refreshIndexViewport()
+		}
+		return nil
+	}
+
+	if p, err := m.loader.LoadFrom(m.root); err == nil {
+		m.project = p
+	}
+	var archiveErr error
+	m.index.ArchiveChanges, archiveErr = m.loader.ListArchiveChangesFrom(m.root)
+	if archiveErr != nil {
+		m.errMsg = "error loading archive changes: " + archiveErr.Error()
+	}
+	var specErr error
+	m.projectSpecs, specErr = m.loader.LoadProjectSpecsFrom(m.root)
+	if specErr != nil {
+		m.errMsg = "error loading project specs: " + specErr.Error()
+	}
+	m.index.ExpandedSpecs = make(map[int]bool)
+	m.buildIndexItems()
+	if m.index.Cursor >= len(m.index.Items) {
+		m.index.Cursor = max(0, len(m.index.Items)-1)
+	}
+	m.refreshIndexViewport()
+	return nil
+}
+
+func (m *Model) pollNormalModeChanges() tea.Cmd {
+	diskNames, err := m.loader.ListChangeNamesFrom(m.root)
+	if err != nil {
+		return nil
+	}
+	if !sameNames(m.project.Changes, diskNames) {
+		currentName := ""
+		if ch := m.current(); ch != nil {
+			currentName = ch.Name
+		}
+		if p, err := m.loader.LoadFrom(m.root); err == nil {
+			m.project = p
+			m.changeIdx = 0
+			for i, ch := range p.Changes {
+				if ch.Name == currentName {
+					m.changeIdx = i
+					break
+				}
+			}
+			if len(p.Changes) == 0 {
+				return nil
+			}
+			m.renderCache = make(map[Tab]string)
+			m.tab = m.defaultTab()
+			m.loadTaskItems()
+			return m.loadViewport()
+		}
+	}
+	return nil
+}
+
+func (m *Model) pollNormalModeContent() tea.Cmd {
 	ch := m.current()
 	if ch == nil {
 		return nil
 	}
-	fresh := openspec.ReloadChange(*ch)
+	var cursorText string
+	if m.tasks.Cursor < len(m.tasks.Items) && m.tasks.Items[m.tasks.Cursor].Kind == openspec.KindTask {
+		cursorText = m.tasks.Items[m.tasks.Cursor].Text
+	}
+	fresh := m.loader.ReloadChange(*ch)
+	tasksChanged, viewportDirty := m.mergeReloadedChange(fresh)
 
-	if fresh.Tasks.Present != ch.Tasks.Present || fresh.Tasks.Content != ch.Tasks.Content {
-		var cursorText string
-		if m.taskCursor < len(m.taskItems) && m.taskItems[m.taskCursor].Kind == openspec.KindTask {
-			cursorText = m.taskItems[m.taskCursor].Text
+	if tasksChanged {
+		if cursorText != "" {
+			m.tasks.Cursor = openspec.FindCursorByText(m.tasks.Items, cursorText)
 		}
-		m.project.Changes[m.changeIdx].Tasks = fresh.Tasks
-		m.taskItems = openspec.ParseTasks(fresh.Tasks.Content)
-		m.taskCursor = openspec.FindCursorByText(m.taskItems, cursorText)
 		if m.tab == TabTasks {
 			m.refreshTasksViewport()
-		}
-	}
-
-	viewportDirty := false
-	if fresh.Proposal.Present != ch.Proposal.Present || fresh.Proposal.Content != ch.Proposal.Content {
-		m.project.Changes[m.changeIdx].Proposal = fresh.Proposal
-		delete(m.renderCache, TabProposal)
-		if m.tab == TabProposal {
-			viewportDirty = true
-		}
-	}
-	if fresh.Design.Present != ch.Design.Present || fresh.Design.Content != ch.Design.Content {
-		m.project.Changes[m.changeIdx].Design = fresh.Design
-		delete(m.renderCache, TabDesign)
-		if m.tab == TabDesign {
-			viewportDirty = true
-		}
-	}
-	if fresh.Specs.Present != ch.Specs.Present || fresh.Specs.Content != ch.Specs.Content {
-		m.project.Changes[m.changeIdx].Specs = fresh.Specs
-		m.project.Changes[m.changeIdx].SpecFiles = fresh.SpecFiles
-		if m.specIdx >= len(fresh.SpecFiles) {
-			m.specIdx = 0
-		}
-		delete(m.renderCache, TabSpecs)
-		if m.tab == TabSpecs {
-			viewportDirty = true
 		}
 	}
 	if viewportDirty {
@@ -155,13 +150,21 @@ func (m *Model) handleTick() tea.Cmd {
 }
 
 func (m *Model) enterIndex() {
-	if len(m.archiveChanges) == 0 {
-		m.archiveChanges, _ = openspec.ListArchiveChangesFrom(m.root)
+	if len(m.index.ArchiveChanges) == 0 {
+		var archiveErr error
+		m.index.ArchiveChanges, archiveErr = m.loader.ListArchiveChangesFrom(m.root)
+		if archiveErr != nil {
+			m.errMsg = "error loading archive changes: " + archiveErr.Error()
+		}
 	}
-	m.projectSpecs, _ = openspec.LoadProjectSpecsFrom(m.root)
-	m.expandedSpecs = make(map[int]bool)
+	var specErr error
+	m.projectSpecs, specErr = m.loader.LoadProjectSpecsFrom(m.root)
+	if specErr != nil {
+		m.errMsg = "error loading project specs: " + specErr.Error()
+	}
+	m.index.ExpandedSpecs = make(map[int]bool)
 	m.buildIndexItems()
-	m.indexCursor = 0
+	m.index.Cursor = 0
 	m.mode = ModeIndex
 	m.vp.SetHeight(m.contentHeight())
 	m.refreshIndexViewport()
@@ -176,34 +179,34 @@ func specSuffix(name string) string {
 
 func (m *Model) buildSpecOrder() {
 	n := len(m.projectSpecs)
-	m.specOrder = make([]int, n)
-	for i := range m.specOrder {
-		m.specOrder[i] = i
+	m.index.Order = make([]int, n)
+	for i := range m.index.Order {
+		m.index.Order[i] = i
 	}
-	if m.specSortBySuffix {
-		sort.SliceStable(m.specOrder, func(a, b int) bool {
-			return specSuffix(m.projectSpecs[m.specOrder[a]].Name) < specSuffix(m.projectSpecs[m.specOrder[b]].Name)
+	if m.index.SortBySuffix {
+		sort.SliceStable(m.index.Order, func(a, b int) bool {
+			return specSuffix(m.projectSpecs[m.index.Order[a]].Name) < specSuffix(m.projectSpecs[m.index.Order[b]].Name)
 		})
 	}
 }
 
 func (m *Model) buildIndexItems() {
 	m.buildSpecOrder()
-	m.indexItems = nil
+	m.index.Items = nil
 	for i := range m.project.Changes {
-		m.indexItems = append(m.indexItems, indexItem{kind: indexKindActive, idx: i})
+		m.index.Items = append(m.index.Items, indexItem{kind: indexKindActive, idx: i})
 	}
-	for _, i := range m.specOrder {
+	for _, i := range m.index.Order {
 		ps := m.projectSpecs[i]
-		m.indexItems = append(m.indexItems, indexItem{kind: indexKindSpec, idx: i})
-		if m.expandedSpecs[i] {
+		m.index.Items = append(m.index.Items, indexItem{kind: indexKindSpec, idx: i})
+		if m.index.ExpandedSpecs[i] {
 			for r := range ps.RequirementNames {
-				m.indexItems = append(m.indexItems, indexItem{kind: indexKindRequirement, idx: i, reqIdx: r})
+				m.index.Items = append(m.index.Items, indexItem{kind: indexKindRequirement, idx: i, reqIdx: r})
 			}
 		}
 	}
-	for i := range m.archiveChanges {
-		m.indexItems = append(m.indexItems, indexItem{kind: indexKindArchived, idx: i})
+	for i := range m.index.ArchiveChanges {
+		m.index.Items = append(m.index.Items, indexItem{kind: indexKindArchived, idx: i})
 	}
 }
 
@@ -223,7 +226,6 @@ func (m *Model) renderIndexContent() (string, int) {
 	line := 0
 	cursorLine := 0
 
-	// ── Activos ──────────────────────────────────────────────────────────────
 	sb.WriteString("\n")
 	line++
 	sb.WriteString("  " + sectionStyle.Render("Active Changes") + "\n\n")
@@ -234,9 +236,9 @@ func (m *Model) renderIndexContent() (string, int) {
 		line++
 	} else {
 		for i, ch := range m.project.Changes {
-			cursor := m.indexCursor < len(m.indexItems) &&
-				m.indexItems[m.indexCursor].kind == indexKindActive &&
-				m.indexItems[m.indexCursor].idx == i
+			cursor := m.index.Cursor < len(m.index.Items) &&
+				m.index.Items[m.index.Cursor].kind == indexKindActive &&
+				m.index.Items[m.index.Cursor].idx == i
 			if cursor {
 				cursorLine = line
 			}
@@ -248,7 +250,6 @@ func (m *Model) renderIndexContent() (string, int) {
 	sb.WriteString("\n")
 	line++
 
-	// ── Specs ─────────────────────────────────────────────────────────────────
 	sb.WriteString("  " + sectionStyle.Render("Specifications") + "\n\n")
 	line += 2
 
@@ -262,11 +263,11 @@ func (m *Model) renderIndexContent() (string, int) {
 				maxName = len(ps.Name)
 			}
 		}
-		for _, i := range m.specOrder {
+		for _, i := range m.index.Order {
 			ps := m.projectSpecs[i]
-			cursor := m.indexCursor < len(m.indexItems) &&
-				m.indexItems[m.indexCursor].kind == indexKindSpec &&
-				m.indexItems[m.indexCursor].idx == i
+			cursor := m.index.Cursor < len(m.index.Items) &&
+				m.index.Items[m.index.Cursor].kind == indexKindSpec &&
+				m.index.Items[m.index.Cursor].idx == i
 			if cursor {
 				cursorLine = line
 			}
@@ -280,12 +281,12 @@ func (m *Model) renderIndexContent() (string, int) {
 			}
 			sb.WriteString(cursorMark + name + pad + "  " + label + "\n")
 			line++
-			if m.expandedSpecs[i] {
+			if m.index.ExpandedSpecs[i] {
 				for r, reqName := range ps.RequirementNames {
-					reqCursor := m.indexCursor < len(m.indexItems) &&
-						m.indexItems[m.indexCursor].kind == indexKindRequirement &&
-						m.indexItems[m.indexCursor].idx == i &&
-						m.indexItems[m.indexCursor].reqIdx == r
+					reqCursor := m.index.Cursor < len(m.index.Items) &&
+						m.index.Items[m.index.Cursor].kind == indexKindRequirement &&
+						m.index.Items[m.index.Cursor].idx == i &&
+						m.index.Items[m.index.Cursor].reqIdx == r
 					if reqCursor {
 						cursorLine = line
 					}
@@ -305,23 +306,22 @@ func (m *Model) renderIndexContent() (string, int) {
 	sb.WriteString("\n")
 	line++
 
-	// ── Archivados ────────────────────────────────────────────────────────────
 	sb.WriteString("  " + sectionStyle.Render("Archived Changes") + "\n\n")
 	line += 2
 
-	if len(m.archiveChanges) == 0 {
+	if len(m.index.ArchiveChanges) == 0 {
 		sb.WriteString(helpStyle.Render("  No archived changes") + "\n")
 	} else {
 		maxName := 0
-		for _, ch := range m.archiveChanges {
+		for _, ch := range m.index.ArchiveChanges {
 			if len(ch.Name) > maxName {
 				maxName = len(ch.Name)
 			}
 		}
-		for i, ch := range m.archiveChanges {
-			cursor := m.indexCursor < len(m.indexItems) &&
-				m.indexItems[m.indexCursor].kind == indexKindArchived &&
-				m.indexItems[m.indexCursor].idx == i
+		for i, ch := range m.index.ArchiveChanges {
+			cursor := m.index.Cursor < len(m.index.Items) &&
+				m.index.Items[m.index.Cursor].kind == indexKindArchived &&
+				m.index.Items[m.index.Cursor].idx == i
 			if cursor {
 				cursorLine = line
 			}
@@ -360,7 +360,6 @@ func (m *Model) renderActiveItem(ch openspec.Change, cursor bool, contentWidth i
 	}
 
 	countStr := fmt.Sprintf(" %d/%d", done, total)
-	// layout: 2 (cursor) + nameColWidth + 1 ([) + barSpace + 1 (]) + len(countStr)
 	barSpace := contentWidth - 2 - nameColWidth - 2 - len(countStr)
 	if barSpace < 4 {
 		barSpace = 4
@@ -394,10 +393,74 @@ func (m *Model) renderArchivedItem(ch openspec.Change, cursor bool, maxName int)
 	return cursorMark + name + "  " + date
 }
 
-func taskCounts(ch openspec.Change) (done, total int) {
+const indexViewportContentStart = 3
+
+func (m *Model) indexItemAtContentLine(contentLine int) (int, bool) {
+	line := 0
+
+	line += 3
+
+	activeEnd := 0
+	for activeEnd < len(m.index.Items) && m.index.Items[activeEnd].kind == indexKindActive {
+		activeEnd++
+	}
+
+	if activeEnd > 0 {
+		for itemIdx := range activeEnd {
+			if line == contentLine {
+				return itemIdx, true
+			}
+			line++
+		}
+	}
+	if activeEnd == 0 {
+		line++
+	}
+
+	line++
+
+	line += 2
+
+	specEnd := activeEnd
+	for specEnd < len(m.index.Items) && (m.index.Items[specEnd].kind == indexKindSpec || m.index.Items[specEnd].kind == indexKindRequirement) {
+		specEnd++
+	}
+
+	if specEnd > activeEnd {
+		for itemIdx := activeEnd; itemIdx < specEnd; itemIdx++ {
+			if line == contentLine {
+				return itemIdx, true
+			}
+			line++
+		}
+	}
+	if specEnd == activeEnd {
+		line++
+	}
+
+	line++
+
+	line += 2
+
+	if specEnd >= len(m.index.Items) {
+		line++
+	}
+
+	for itemIdx := specEnd; itemIdx < len(m.index.Items); itemIdx++ {
+		if line == contentLine {
+			return itemIdx, true
+		}
+		line++
+	}
+
+	return 0, false
+}
+
+func taskCounts(ch openspec.Change) (int, int) {
 	if !ch.Tasks.Present {
 		return 0, 0
 	}
+	done, total := 0, 0
 	for _, item := range openspec.ParseTasks(ch.Tasks.Content) {
 		if item.Kind == openspec.KindTask {
 			total++
@@ -406,7 +469,7 @@ func taskCounts(ch openspec.Change) (done, total int) {
 			}
 		}
 	}
-	return
+	return done, total
 }
 
 func sameNames(changes []openspec.Change, diskNames []string) bool {
@@ -437,4 +500,104 @@ func sameStrings(a, b []string) bool {
 	return true
 }
 
+func (m Model) updateIndex(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
 
+	case "i":
+		m.prevMode = m.mode
+		m.mode = ModeViewingConfig
+		return m.commitStateChange()
+
+	case "esc":
+		return m, tea.Quit
+
+	case "j", "down":
+		if m.index.Cursor < len(m.index.Items)-1 {
+			m.index.Cursor++
+		}
+		m.refreshIndexViewport()
+
+	case "k", "up":
+		if m.index.Cursor > 0 {
+			m.index.Cursor--
+		}
+		m.refreshIndexViewport()
+
+	case "enter":
+		if len(m.index.Items) > 0 {
+			item := m.index.Items[m.index.Cursor]
+			m.renderCache = make(map[Tab]string)
+			if item.kind == indexKindActive {
+				m.changeIdx = item.idx
+				m.mode = ModeNormal
+				m.tab = m.defaultTab()
+				m.loadTaskItems()
+				return m.commitStateChange()
+			}
+			if item.kind == indexKindSpec {
+				m.specViewer.Cursor = item.idx
+				m.specViewer.JumpTarget = ""
+				m.specViewer.FocusMode = false
+				m.specViewer.ReqCursor = 0
+				m.mode = ModeViewingSpec
+				return m.commitStateChange()
+			}
+			if item.kind == indexKindRequirement {
+				m.specViewer.Cursor = item.idx
+				m.specViewer.JumpTarget = m.projectSpecs[item.idx].RequirementNames[item.reqIdx]
+				m.specViewer.FocusMode = true
+				m.specViewer.ReqCursor = item.reqIdx
+				m.mode = ModeViewingSpec
+				return m.commitStateChange()
+			}
+			m.index.ArchiveCursor = item.idx
+			m.tab = firstAvailableTab(m.index.ArchiveChanges[item.idx])
+			m.mode = ModeViewingArchive
+			return m.commitStateChange()
+		}
+
+	case "space":
+		if len(m.index.Items) > 0 {
+			item := m.index.Items[m.index.Cursor]
+			if item.kind == indexKindSpec {
+				specIdx := item.idx
+				m.index.ExpandedSpecs[specIdx] = !m.index.ExpandedSpecs[specIdx]
+				m.buildIndexItems()
+				m.index.Cursor = 0
+				for i, it := range m.index.Items {
+					if it.kind == indexKindSpec && it.idx == specIdx {
+						m.index.Cursor = i
+						break
+					}
+				}
+				if m.index.Cursor >= len(m.index.Items) {
+					m.index.Cursor = max(0, len(m.index.Items)-1)
+				}
+				m.refreshIndexViewport()
+			}
+		}
+
+	case "s":
+		savedKind := indexKindActive
+		savedIdx := -1
+		savedReqIdx := 0
+		if m.index.Cursor < len(m.index.Items) {
+			item := m.index.Items[m.index.Cursor]
+			savedKind = item.kind
+			savedIdx = item.idx
+			savedReqIdx = item.reqIdx
+		}
+		m.index.SortBySuffix = !m.index.SortBySuffix
+		m.buildIndexItems()
+		if savedIdx >= 0 {
+			for i, it := range m.index.Items {
+				if it.kind == savedKind && it.idx == savedIdx && it.reqIdx == savedReqIdx {
+					m.index.Cursor = i
+					break
+				}
+			}
+		}
+		m.refreshIndexViewport()
+	}
+	return m, nil
+}

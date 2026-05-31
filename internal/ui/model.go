@@ -8,6 +8,7 @@ import (
 
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
+	"charm.land/glamour/v2"
 	"github.com/fselich/dossier/internal/openspec"
 )
 
@@ -55,10 +56,32 @@ type renderedConfigMsg struct {
 
 type tickMsg time.Time
 
+type indexState struct {
+	Items          []indexItem
+	Cursor         int
+	ExpandedSpecs  map[int]bool
+	SortBySuffix   bool
+	Order          []int
+	ArchiveChanges []openspec.Change
+	ArchiveCursor  int
+}
+
+type specViewerState struct {
+	Cursor     int
+	JumpTarget string
+	FocusMode  bool
+	ReqCursor  int
+}
+
+type taskState struct {
+	Items  []openspec.TaskItem
+	Cursor int
+}
+
 type indexItemKind int
 
 const (
-	indexKindActive      indexItemKind = iota
+	indexKindActive indexItemKind = iota
 	indexKindArchived
 	indexKindSpec
 	indexKindRequirement
@@ -75,7 +98,8 @@ type Theme struct {
 }
 
 type Model struct {
-	root string
+	root   string
+	loader *openspec.Loader
 
 	project   *openspec.Project
 	changeIdx int
@@ -84,8 +108,7 @@ type Model struct {
 	vp      viewport.Model
 	vpReady bool
 
-	taskItems  []openspec.TaskItem
-	taskCursor int
+	tasks taskState
 
 	specIdx int
 
@@ -95,29 +118,23 @@ type Model struct {
 
 	width, height int
 
-	renderCache map[Tab]string
+	renderCache     map[Tab]string
+	glamourRenderer *glamour.TermRenderer
+	lastRenderWidth int
 
-	mode           Mode
-	prevMode       Mode
-	archiveChanges []openspec.Change
-	archiveCursor  int
-	indexItems     []indexItem
-	indexCursor    int
-	expandedSpecs  map[int]bool
-	projectSpecs     []openspec.ProjectSpec
-	specSortBySuffix bool
-	specOrder        []int
-	specViewerCursor int
-	specJumpTarget   string
-	specFocusMode    bool
-	specReqCursor    int
-	projectConfig    openspec.ProjectConfig
-	theme            Theme
+	mode          Mode
+	prevMode      Mode
+	index         indexState
+	projectSpecs  []openspec.ProjectSpec
+	specViewer    specViewerState
+	projectConfig openspec.ProjectConfig
+	theme         Theme
 }
 
-func New(project *openspec.Project, cfg openspec.ProjectConfig, root string) Model {
+func New(project *openspec.Project, cfg openspec.ProjectConfig, root string, loader *openspec.Loader) Model {
 	m := Model{
 		root:          root,
+		loader:        loader,
 		project:       project,
 		renderCache:   make(map[Tab]string),
 		projectConfig: cfg,
@@ -127,17 +144,25 @@ func New(project *openspec.Project, cfg openspec.ProjectConfig, root string) Mod
 		m.tab = m.defaultTab()
 		m.loadTaskItems()
 	} else {
-		m.archiveChanges, _ = openspec.ListArchiveChangesFrom(root)
-		m.projectSpecs, _ = openspec.LoadProjectSpecsFrom(root)
-		m.expandedSpecs = make(map[int]bool)
+		var archiveErr error
+		m.index.ArchiveChanges, archiveErr = loader.ListArchiveChangesFrom(root)
+		if archiveErr != nil {
+			m.errMsg = "error loading archive changes: " + archiveErr.Error()
+		}
+		var specErr error
+		m.projectSpecs, specErr = loader.LoadProjectSpecsFrom(root)
+		if specErr != nil {
+			m.errMsg = "error loading project specs: " + specErr.Error()
+		}
+		m.index.ExpandedSpecs = make(map[int]bool)
 		m.buildIndexItems()
 		m.mode = ModeIndex
 	}
 	return m
 }
 
-func NewSinglePath(project *openspec.Project, cfg openspec.ProjectConfig, root string) Model {
-	m := New(project, cfg, root)
+func NewSinglePath(project *openspec.Project, cfg openspec.ProjectConfig, root string, loader *openspec.Loader) Model {
+	m := New(project, cfg, root, loader)
 	m.singlePath = true
 	return m
 }
@@ -153,9 +178,9 @@ func (m Model) View() tea.View {
 
 	var content string
 	if m.mode == ModeViewingConfig {
-		content = m.viewConfigContent()
+		content = m.viewContentWithChrome()
 	} else if m.mode == ModeIndex || m.mode == ModeViewingSpec {
-		content = m.viewIndexContent()
+		content = m.viewContentWithChrome()
 	} else if len(m.project.Changes) == 0 && m.mode == ModeNormal {
 		content = m.emptyViewContent()
 	} else {
@@ -229,7 +254,7 @@ func (m *Model) defaultTab() Tab {
 
 func (m *Model) nextAvailableTab(current Tab, delta int) Tab {
 	next := current
-	for i := 0; i < int(tabCount); i++ {
+	for range int(tabCount) {
 		next = Tab((int(next) + delta + int(tabCount)) % int(tabCount))
 		if m.tabAvailable(next) {
 			return next
@@ -277,24 +302,33 @@ func (m *Model) artifactPath() string {
 }
 
 func (m *Model) currentArchive() *openspec.Change {
-	if m.archiveCursor < len(m.archiveChanges) {
-		return &m.archiveChanges[m.archiveCursor]
+	if m.index.ArchiveCursor < len(m.index.ArchiveChanges) {
+		return &m.index.ArchiveChanges[m.index.ArchiveCursor]
 	}
 	return nil
 }
 
+const (
+	chromeTop        = 1
+	chromeHeader     = 1
+	chromeTabBar     = 1
+	chromeInnerSep   = 1
+	chromeSpecSubnav = 1
+	chromeHelpBar    = 1
+	chromeBottom     = 1
+)
+
 func (m *Model) contentHeight() int {
 	if m.mode == ModeIndex || m.mode == ModeViewingSpec || m.mode == ModeViewingConfig {
-		// top+bottom borders + header + 2 inner seps + helpBar (no tab bar)
-		h := m.height - 6
+		h := m.height - (chromeTop + chromeHeader + chromeInnerSep + chromeInnerSep + chromeHelpBar + chromeBottom)
 		if h < 1 {
 			h = 1
 		}
 		return h
 	}
-	h := m.height - 7 // top+bottom borders + header + tabBar + 2 inner seps + helpBar
+	h := m.height - (chromeTop + chromeHeader + chromeTabBar + chromeInnerSep + chromeInnerSep + chromeHelpBar + chromeBottom)
 	if m.hasSpecSubnav() {
-		h--
+		h -= chromeSpecSubnav
 	}
 	if h < 1 {
 		h = 1
@@ -302,3 +336,44 @@ func (m *Model) contentHeight() int {
 	return h
 }
 
+// mergeReloadedChange updates in-memory state from a freshly reloaded Change
+// and returns which artifacts changed. It does not handle cursor preservation
+// or viewport refresh — the caller handles those.
+func (m *Model) mergeReloadedChange(fresh openspec.Change) (tasksChanged bool, viewportDirty bool) {
+	ch := m.current()
+	if ch == nil {
+		return false, false
+	}
+
+	if fresh.Tasks.Present != ch.Tasks.Present || fresh.Tasks.Content != ch.Tasks.Content {
+		m.project.Changes[m.changeIdx].Tasks = fresh.Tasks
+		m.tasks.Items = openspec.ParseTasks(fresh.Tasks.Content)
+		tasksChanged = true
+	}
+	if fresh.Proposal.Present != ch.Proposal.Present || fresh.Proposal.Content != ch.Proposal.Content {
+		m.project.Changes[m.changeIdx].Proposal = fresh.Proposal
+		delete(m.renderCache, TabProposal)
+		if m.tab == TabProposal {
+			viewportDirty = true
+		}
+	}
+	if fresh.Design.Present != ch.Design.Present || fresh.Design.Content != ch.Design.Content {
+		m.project.Changes[m.changeIdx].Design = fresh.Design
+		delete(m.renderCache, TabDesign)
+		if m.tab == TabDesign {
+			viewportDirty = true
+		}
+	}
+	if fresh.Specs.Present != ch.Specs.Present || fresh.Specs.Content != ch.Specs.Content {
+		m.project.Changes[m.changeIdx].Specs = fresh.Specs
+		m.project.Changes[m.changeIdx].SpecFiles = fresh.SpecFiles
+		if m.specIdx >= len(fresh.SpecFiles) {
+			m.specIdx = 0
+		}
+		delete(m.renderCache, TabSpecs)
+		if m.tab == TabSpecs {
+			viewportDirty = true
+		}
+	}
+	return
+}

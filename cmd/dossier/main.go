@@ -44,20 +44,22 @@ func main() {
 		os.Exit(1)
 	}
 
+	loader := openspec.NewLoader(openspec.OSFS{})
+
 	if len(os.Args) > 1 {
 		project, err = openspec.LoadFromPath(os.Args[1])
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "error:", err)
 			os.Exit(1)
 		}
-		model = ui.NewSinglePath(project, cfg, os.Args[1])
+		model = ui.NewSinglePath(project, cfg, os.Args[1], loader)
 	} else {
 		project, err = openspec.LoadFrom(cwd)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
-		model = ui.New(project, cfg, cwd)
+		model = ui.New(project, cfg, cwd, loader)
 	}
 
 	p := tea.NewProgram(model)

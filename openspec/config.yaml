@@ -7,6 +7,12 @@ context: |
   Domain: terminal UI tool for navigating OpenSpec project artifacts (proposals, designs, specs, tasks).
   The project itself follows OpenSpec (spec-driven development): changes live under openspec/changes/, long-lived specs under openspec/specs/.
 
+  When working on any artifact or implementing changes, load and apply these skills:
+  - golang-code-style: Go formatting, conventions, and code review
+  - golang-patterns: idiomatic Go patterns (small interfaces, explicit error handling)
+  - golang-testing: test patterns (table-driven tests, subtests, coverage)
+  - golang-performance: optimization when profiling identifies bottlenecks
+
 rules:
   proposal:
     - Always include a "Non-goals" section to make scope boundaries explicit

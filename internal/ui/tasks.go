@@ -24,16 +24,16 @@ func (m *Model) refreshTasksViewport() {
 func (m *Model) loadTaskItems() {
 	ch := m.current()
 	if ch == nil || !ch.Tasks.Present {
-		m.taskItems = nil
-		m.taskCursor = 0
+		m.tasks.Items = nil
+		m.tasks.Cursor = 0
 		return
 	}
-	m.taskItems = openspec.ParseTasks(ch.Tasks.Content)
-	m.taskCursor = m.firstTaskIdx()
+	m.tasks.Items = openspec.ParseTasks(ch.Tasks.Content)
+	m.tasks.Cursor = m.firstTaskIdx()
 }
 
 func (m *Model) firstTaskIdx() int {
-	for i, item := range m.taskItems {
+	for i, item := range m.tasks.Items {
 		if item.Kind == openspec.KindTask {
 			return i
 		}
@@ -42,35 +42,35 @@ func (m *Model) firstTaskIdx() int {
 }
 
 func (m *Model) moveCursorDown() {
-	for i := m.taskCursor + 1; i < len(m.taskItems); i++ {
-		if m.taskItems[i].Kind == openspec.KindTask {
-			m.taskCursor = i
+	for i := m.tasks.Cursor + 1; i < len(m.tasks.Items); i++ {
+		if m.tasks.Items[i].Kind == openspec.KindTask {
+			m.tasks.Cursor = i
 			return
 		}
 	}
 }
 
 func (m *Model) moveCursorUp() {
-	for i := m.taskCursor - 1; i >= 0; i-- {
-		if m.taskItems[i].Kind == openspec.KindTask {
-			m.taskCursor = i
+	for i := m.tasks.Cursor - 1; i >= 0; i-- {
+		if m.tasks.Items[i].Kind == openspec.KindTask {
+			m.tasks.Cursor = i
 			return
 		}
 	}
 }
 
 func (m *Model) doToggle() tea.Cmd {
-	if len(m.taskItems) == 0 || m.taskCursor >= len(m.taskItems) {
+	if len(m.tasks.Items) == 0 || m.tasks.Cursor >= len(m.tasks.Items) {
 		return nil
 	}
-	if m.taskItems[m.taskCursor].Kind != openspec.KindTask {
+	if m.tasks.Items[m.tasks.Cursor].Kind != openspec.KindTask {
 		return nil
 	}
 	ch := m.current()
 	if ch == nil {
 		return nil
 	}
-	if err := openspec.ToggleTask(ch.Path+"/tasks.md", m.taskItems, m.taskCursor); err != nil {
+	if err := m.loader.ToggleTask(ch.Path+"/tasks.md", m.tasks.Items, m.tasks.Cursor); err != nil {
 		m.errMsg = "error: " + err.Error()
 		return tea.Tick(3*time.Second, func(time.Time) tea.Msg { return errClearMsg{} })
 	}
@@ -81,6 +81,10 @@ func (m *Model) doToggle() tea.Cmd {
 var (
 	rxCode = regexp.MustCompile("`(.+?)`")
 	rxBold = regexp.MustCompile(`\*\*(.+?)\*\*`)
+
+	underlineStyle = lipgloss.NewStyle().Underline(true)
+	boldStyle      = lipgloss.NewStyle().Bold(true)
+	cyanStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("6"))
 )
 
 func extractOpeningEscape(style lipgloss.Style) string {
@@ -95,17 +99,17 @@ func extractOpeningEscape(style lipgloss.Style) string {
 func inlineMarkdown(s, restore string, done bool) string {
 	if done {
 		s = rxCode.ReplaceAllStringFunc(s, func(m string) string {
-			return "\033[4m" + rxCode.FindStringSubmatch(m)[1] + "\033[24m"
+			return underlineStyle.Render(rxCode.FindStringSubmatch(m)[1]) + restore
 		})
 		s = rxBold.ReplaceAllStringFunc(s, func(m string) string {
-			return "\033[1m" + rxBold.FindStringSubmatch(m)[1] + "\033[22m"
+			return boldStyle.Render(rxBold.FindStringSubmatch(m)[1]) + restore
 		})
 	} else {
 		s = rxCode.ReplaceAllStringFunc(s, func(m string) string {
-			return "\033[36m" + rxCode.FindStringSubmatch(m)[1] + "\033[0m" + restore
+			return cyanStyle.Render(rxCode.FindStringSubmatch(m)[1]) + restore
 		})
 		s = rxBold.ReplaceAllStringFunc(s, func(m string) string {
-			return "\033[1m" + rxBold.FindStringSubmatch(m)[1] + "\033[0m" + restore
+			return boldStyle.Render(rxBold.FindStringSubmatch(m)[1]) + restore
 		})
 	}
 	return s
@@ -119,21 +123,21 @@ func (m *Model) renderTasksContent() (string, int) {
 	pendingRestore := extractOpeningEscape(taskPendingStyle)
 	doneRestore := extractOpeningEscape(taskDoneStyle)
 
-	for i, item := range m.taskItems {
+	for i, item := range m.tasks.Items {
 		switch item.Kind {
 		case openspec.KindSection:
 			if i > 0 {
 				sb.WriteString("\n")
 				line++
 			}
-			done, total := sectionProgress(m.taskItems, i)
+			done, total := sectionProgress(m.tasks.Items, i)
 			sectionLine := sectionStyle.Render("  "+item.Text) + "  " + progressBar(done, total, 5)
 			sb.WriteString(sectionLine + "\n")
 			line += lipgloss.Height(sectionLine)
 			sb.WriteString("\n")
 			line++
 		case openspec.KindTask:
-			if i == m.taskCursor {
+			if i == m.tasks.Cursor {
 				cursorLine = line
 			}
 			checkbox := "[ ]"
@@ -145,7 +149,7 @@ func (m *Model) renderTasksContent() (string, int) {
 				restore = doneRestore
 			}
 			var prefix string
-			if i == m.taskCursor {
+			if i == m.tasks.Cursor {
 				prefix = taskCursorMarkStyle.Render("▶") + restore + " "
 				checkbox = taskCursorMarkStyle.Render(checkbox) + restore
 			} else {
@@ -179,8 +183,8 @@ func sectionProgress(items []openspec.TaskItem, sectionIdx int) (done, total int
 	return
 }
 
-func progressBar(done, total, width int) string {
-	if total == 0 {
+func renderProgressBar(done, total, width int, filledChar, emptyChar string) string {
+	if total == 0 || width <= 0 {
 		return ""
 	}
 	filled := (done * width) / total
@@ -189,7 +193,11 @@ func progressBar(done, total, width int) string {
 		filled = width
 		filledStyle = progressCompleteStyle
 	}
-	bar := filledStyle.Render(strings.Repeat("─", filled)) +
-		progressEmptyStyle.Render(strings.Repeat("─", width-filled))
+	return filledStyle.Render(strings.Repeat(filledChar, filled)) +
+		progressEmptyStyle.Render(strings.Repeat(emptyChar, width-filled))
+}
+
+func progressBar(done, total, width int) string {
+	bar := renderProgressBar(done, total, width, "─", "─")
 	return bar + helpStyle.Render(fmt.Sprintf(" %d/%d", done, total))
 }

@@ -6,135 +6,122 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/glamour/v2"
+	"github.com/fselich/dossier/internal/openspec"
 )
-
-func extractRequirement(raw, name string) string {
-	target := "### Requirement: " + name
-	lines := strings.Split(raw, "\n")
-	start := -1
-	for i, l := range lines {
-		if l == target {
-			start = i
-			break
-		}
-	}
-	if start < 0 {
-		return ""
-	}
-	block := []string{lines[start]}
-	for _, l := range lines[start+1:] {
-		if strings.HasPrefix(l, "### Requirement: ") {
-			break
-		}
-		block = append(block, l)
-	}
-	return strings.Join(block, "\n")
-}
 
 func (m *Model) loadViewport() tea.Cmd {
 	if !m.vpReady {
 		return nil
 	}
-	if m.mode == ModeIndex {
-		m.refreshIndexViewport()
+	switch {
+	case m.mode == ModeIndex:
+		return m.loadViewportForIndex()
+	case m.mode == ModeViewingConfig:
+		return m.loadViewportForConfig()
+	case m.mode == ModeViewingSpec:
+		return m.loadViewportForSpec()
+	case m.tab == TabTasks && m.mode == ModeNormal:
+		return m.loadViewportForTasks()
+	default:
+		return m.loadViewportForArtifact()
+	}
+}
+
+func (m *Model) ensureRenderer(width int) {
+	if m.glamourRenderer != nil && m.lastRenderWidth == width {
+		return
+	}
+	r, err := glamour.NewTermRenderer(
+		glamour.WithStandardStyle("dark"),
+		glamour.WithWordWrap(width),
+	)
+	if err != nil {
+		return
+	}
+	m.glamourRenderer = r
+	m.lastRenderWidth = width
+}
+
+func (m *Model) loadViewportForIndex() tea.Cmd {
+	m.refreshIndexViewport()
+	return nil
+}
+
+func (m *Model) loadViewportForConfig() tea.Cmd {
+	raw := openspec.ConfigToMarkdown(m.projectConfig)
+	if raw == "" {
+		m.vp.SetContent("  (no project config found)")
 		return nil
 	}
-	if m.mode == ModeViewingConfig {
-		raw := configToMarkdown(m.projectConfig)
-		if raw == "" {
-			m.vp.SetContent("  (no project config found)")
-			return nil
+	m.loading = true
+	m.vp.SetContent(raw)
+	width := m.renderWidth()
+	m.ensureRenderer(width)
+	return func() tea.Msg {
+		out, err := m.glamourRenderer.Render(raw)
+		if err != nil {
+			return renderedConfigMsg{content: raw}
 		}
-		m.loading = true
-		m.vp.SetContent(raw)
-		width := m.width - 2
-		if width < 20 {
-			width = 80
-		}
-		return func() tea.Msg {
-			r, err := glamour.NewTermRenderer(
-				glamour.WithStandardStyle("dark"),
-				glamour.WithWordWrap(width),
-			)
-			if err != nil {
-				return renderedConfigMsg{content: raw}
-			}
-			out, err := r.Render(raw)
-			if err != nil {
-				return renderedConfigMsg{content: raw}
-			}
-			return renderedConfigMsg{content: out}
-		}
+		return renderedConfigMsg{content: out}
 	}
-	if m.mode == ModeViewingSpec {
-		if m.specViewerCursor >= len(m.projectSpecs) {
-			m.vp.SetContent("  (spec not available)")
-			return nil
-		}
-		raw := m.projectSpecs[m.specViewerCursor].Content
-		if raw == "" {
-			m.vp.SetContent("  (spec not available)")
-			return nil
-		}
-		m.loading = true
-		m.vp.SetContent(raw)
-		width := m.width - 2
-		if width < 20 {
-			width = 80
-		}
-		if m.specFocusMode {
-			jumpTarget := m.specJumpTarget
-			return func() tea.Msg {
-				block := extractRequirement(raw, jumpTarget)
-				if block == "" {
-					return specRenderedMsg{content: "  (spec not available)"}
-				}
-				r, err := glamour.NewTermRenderer(
-					glamour.WithStandardStyle("dark"),
-					glamour.WithWordWrap(width),
-				)
-				if err != nil {
-					return specRenderedMsg{content: block}
-				}
-				out, err := r.Render(block)
-				if err != nil {
-					return specRenderedMsg{content: block}
-				}
-				return specRenderedMsg{content: out}
-			}
-		}
-		jumpTarget := m.specJumpTarget
-		ansiRe := regexp.MustCompile(`\x1b\[[0-9;]*m`)
-		return func() tea.Msg {
-			r, err := glamour.NewTermRenderer(
-				glamour.WithStandardStyle("dark"),
-				glamour.WithWordWrap(width),
-			)
-			if err != nil {
-				return specRenderedMsg{content: raw}
-			}
-			out, err := r.Render(raw)
-			if err != nil {
-				return specRenderedMsg{content: raw}
-			}
-			jumpLine := 0
-			if jumpTarget != "" {
-				for i, l := range strings.Split(out, "\n") {
-					if strings.Contains(ansiRe.ReplaceAllString(l, ""), jumpTarget) {
-						jumpLine = i
-						break
-					}
-				}
-			}
-			return specRenderedMsg{content: out, jumpLine: jumpLine}
-		}
-	}
-	if m.tab == TabTasks && m.mode == ModeNormal {
-		m.refreshTasksViewport()
+}
+
+func (m *Model) loadViewportForSpec() tea.Cmd {
+	if m.specViewer.Cursor >= len(m.projectSpecs) {
+		m.vp.SetContent("  (spec not available)")
 		return nil
+	}
+	raw := m.projectSpecs[m.specViewer.Cursor].Content
+	if raw == "" {
+		m.vp.SetContent("  (spec not available)")
+		return nil
+	}
+	m.loading = true
+	m.vp.SetContent(raw)
+	width := m.renderWidth()
+	m.ensureRenderer(width)
+
+	if m.specViewer.FocusMode {
+		jumpTarget := m.specViewer.JumpTarget
+		return func() tea.Msg {
+			block := openspec.ExtractRequirement(raw, jumpTarget)
+			if block == "" {
+				return specRenderedMsg{content: "  (spec not available)"}
+			}
+			out, err := m.glamourRenderer.Render(block)
+			if err != nil {
+				return specRenderedMsg{content: block}
+			}
+			return specRenderedMsg{content: out}
+		}
 	}
 
-	// Cache hit — instant.
+	jumpTarget := m.specViewer.JumpTarget
+	ansiRe := regexp.MustCompile(`\x1b\[[0-9;]*m`)
+	return func() tea.Msg {
+		out, err := m.glamourRenderer.Render(raw)
+		if err != nil {
+			return specRenderedMsg{content: raw}
+		}
+		jumpLine := 0
+		if jumpTarget != "" {
+			for i, l := range strings.Split(out, "\n") {
+				if strings.Contains(ansiRe.ReplaceAllString(l, ""), jumpTarget) {
+					jumpLine = i
+					break
+				}
+			}
+		}
+		return specRenderedMsg{content: out, jumpLine: jumpLine}
+	}
+}
+
+func (m *Model) loadViewportForTasks() tea.Cmd {
+	m.refreshTasksViewport()
+	return nil
+}
+
+func (m *Model) loadViewportForArtifact() tea.Cmd {
 	if cached, ok := m.renderCache[m.tab]; ok {
 		m.vp.SetContent(cached)
 		return nil
@@ -163,27 +150,25 @@ func (m *Model) loadViewport() tea.Cmd {
 		return nil
 	}
 
-	// Show raw content immediately, render styled version in background.
 	m.loading = true
 	m.vp.SetContent(raw)
 
 	tab := m.tab
-	width := m.width - 2
-	if width < 20 {
-		width = 80
-	}
+	width := m.renderWidth()
+	m.ensureRenderer(width)
 	return func() tea.Msg {
-		r, err := glamour.NewTermRenderer(
-			glamour.WithStandardStyle("dark"),
-			glamour.WithWordWrap(width),
-		)
-		if err != nil {
-			return renderedMsg{tab: tab, content: raw}
-		}
-		out, err := r.Render(raw)
+		out, err := m.glamourRenderer.Render(raw)
 		if err != nil {
 			return renderedMsg{tab: tab, content: raw}
 		}
 		return renderedMsg{tab: tab, content: out}
 	}
+}
+
+func (m *Model) renderWidth() int {
+	width := m.width - 2
+	if width < 20 {
+		width = 80
+	}
+	return width
 }

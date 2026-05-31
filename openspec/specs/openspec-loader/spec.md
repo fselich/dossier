@@ -95,7 +95,7 @@ The loader SHALL expose a `ListSpecNames()` function that returns the names and 
 - **THEN** `ListSpecNames()` returns nil and nil error
 
 ### Requirement: LoadConfig returns error on failure
-`LoadConfig()` SHALL return `(ProjectConfig, error)`. If the config file does not exist, it SHALL return an empty config and nil error. If the YAML is malformed, it SHALL return an error.
+`LoadConfig()` and `LoadConfigFrom()` SHALL return `(ProjectConfig, error)`. If the config file does not exist, they SHALL return an empty config and nil error. If the file exists but cannot be read for another reason (e.g., permission denied, corrupt filesystem), they SHALL return the error. If the YAML is malformed, they SHALL return an error.
 
 #### Scenario: Config file with valid YAML
 - **WHEN** `LoadConfig()` is called and `openspec/config.yaml` contains valid YAML
@@ -104,6 +104,17 @@ The loader SHALL expose a `ListSpecNames()` function that returns the names and 
 #### Scenario: Config file with invalid YAML
 - **WHEN** `LoadConfig()` is called and `openspec/config.yaml` contains malformed YAML
 - **THEN** the function returns an empty `ProjectConfig` and a non-nil error
+
+#### Scenario: Config file read failure (not IsNotExist)
+- **WHEN** `LoadConfigFrom()` is called and `openspec/config.yaml` exists but `os.ReadFile` fails with a non-IsNotExist error (e.g., permission denied)
+- **THEN** the function returns an empty `ProjectConfig` and the error from `os.ReadFile`
+
+### Requirement: Error logging for non-critical loader calls
+Callers of `ListArchiveChangesFrom` and `LoadProjectSpecsFrom` SHALL not discard errors silently. When these functions return a non-nil error, the caller SHALL log it so the failure is visible.
+
+#### Scenario: Archive load fails
+- **WHEN** `ListArchiveChangesFrom()` returns a non-nil error
+- **THEN** the caller logs the error to stderr and continues with an empty archive list
 
 ### Requirement: LoadProjectSpecs returns error on failure
 `LoadProjectSpecs()` SHALL return `([]ProjectSpec, error)`. If the `openspec/specs/` directory does not exist, it SHALL return nil and nil error. If a read error occurs for another reason, the error SHALL be propagated.

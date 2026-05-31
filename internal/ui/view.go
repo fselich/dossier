@@ -2,7 +2,6 @@ package ui
 
 import (
 	"fmt"
-	"sort"
 	"strings"
 
 	"charm.land/lipgloss/v2"
@@ -28,20 +27,7 @@ func (m *Model) mainViewContent() string {
 	return strings.Join(rows, "\n")
 }
 
-func (m *Model) viewIndexContent() string {
-	rows := []string{
-		m.boxTop(),
-		m.addBorderSides(m.renderHeader()),
-		m.boxInnerSep(),
-		m.addBorderSides(m.vp.View()),
-		m.boxInnerSep(),
-		m.addBorderSides(m.renderHelpBar()),
-		m.boxBottom(),
-	}
-	return strings.Join(rows, "\n")
-}
-
-func (m *Model) viewConfigContent() string {
+func (m *Model) viewContentWithChrome() string {
 	rows := []string{
 		m.boxTop(),
 		m.addBorderSides(m.renderHeader()),
@@ -73,13 +59,13 @@ func (m *Model) renderHeader() string {
 	}
 	if m.mode == ModeViewingSpec {
 		specName := ""
-		if m.specViewerCursor < len(m.projectSpecs) {
-			specName = m.projectSpecs[m.specViewerCursor].Name
+		if m.specViewer.Cursor < len(m.projectSpecs) {
+			specName = m.projectSpecs[m.specViewer.Cursor].Name
 		}
-		if m.specFocusMode && m.specViewerCursor < len(m.projectSpecs) {
-			ps := m.projectSpecs[m.specViewerCursor]
+		if m.specViewer.FocusMode && m.specViewer.Cursor < len(m.projectSpecs) {
+			ps := m.projectSpecs[m.specViewer.Cursor]
 			return headerStyle.Width(m.width - 2).Render(
-				fmt.Sprintf("%s  ·  %s  ·  Req %d/%d", m.project.Name, specName, m.specReqCursor+1, len(ps.RequirementNames)),
+				fmt.Sprintf("%s  ·  %s  ·  Req %d/%d", m.project.Name, specName, m.specViewer.ReqCursor+1, len(ps.RequirementNames)),
 			)
 		}
 		return headerStyle.Width(m.width - 2).Render(
@@ -102,7 +88,7 @@ func (m *Model) renderHeader() string {
 }
 
 func (m *Model) renderTabBar() string {
-	var parts []string
+	parts := make([]string, 0, tabCount)
 	for t := Tab(0); t < tabCount; t++ {
 		label := tabLabels[t]
 		switch {
@@ -116,7 +102,7 @@ func (m *Model) renderTabBar() string {
 	}
 	tabs := strings.Join(parts, " ")
 
-	taskItems := m.taskItems
+	taskItems := m.tasks.Items
 	if m.mode == ModeViewingArchive {
 		if ch := m.currentArchive(); ch != nil && ch.Tasks.Present {
 			taskItems = openspec.ParseTasks(ch.Tasks.Content)
@@ -135,17 +121,9 @@ func (m *Model) renderTabBar() string {
 	}
 	if total > 0 {
 		label := fmt.Sprintf(" %d/%d", done, total)
-		barSpace := (m.width-2) - lipgloss.Width(tabs) - 3 - len(label)
+		barSpace := (m.width - 2) - lipgloss.Width(tabs) - 3 - len(label)
 		if barSpace >= 3 {
-			filled := (done * barSpace) / total
-			filledStyle := progressDoneStyle
-			if done == total {
-				filled = barSpace
-				filledStyle = progressCompleteStyle
-			}
-			bar := "[" + filledStyle.Render(strings.Repeat("█", filled)) +
-				progressEmptyStyle.Render(strings.Repeat("░", barSpace-filled)) + "]"
-			tabs = tabs + " " + bar + helpStyle.Render(label)
+			tabs = tabs + " [" + renderProgressBar(done, total, barSpace, "█", "░") + "]" + helpStyle.Render(label)
 		}
 	}
 	return tabs
@@ -207,16 +185,16 @@ func (m *Model) renderHelpBar() string {
 	}
 	if m.mode == ModeIndex {
 		sortHint := "s: sort by suffix"
-		if m.specSortBySuffix {
+		if m.index.SortBySuffix {
 			sortHint = "s: sort by name"
 		}
-		return helpStyle.Render("j/k: navigate  Enter: open  Space: expand  " + sortHint + "  i: info  Esc: quit")
+		return helpStyle.Render("j/k: navigate  Enter: open  Space: expand  click: select  " + sortHint + "  i: info  Esc: quit")
 	}
 	if m.mode == ModeViewingConfig {
 		return helpStyle.Render("j/k: scroll  i/Esc: back  q: quit")
 	}
 	if m.mode == ModeViewingSpec {
-		if m.specFocusMode {
+		if m.specViewer.FocusMode {
 			return helpStyle.Render("h/l: req anterior/siguiente  j/k: scroll  Esc: index  q: quit")
 		}
 		return helpStyle.Render("j/k: scroll  Esc: index  q: quit")
@@ -228,35 +206,4 @@ func (m *Model) renderHelpBar() string {
 		return helpStyle.Render("h/l: change  1-4/Tab: artifact  j/k: navigate  Space: toggle  e: edit  i: info  Esc: index  q: quit")
 	}
 	return helpStyle.Render("h/l: change  1-4/Tab: artifact  j/k: scroll  e: edit  i: info  Esc: index  q: quit")
-}
-
-func configToMarkdown(cfg openspec.ProjectConfig) string {
-	var sb strings.Builder
-	if cfg.Context != "" {
-		sb.WriteString("## Context\n\n")
-		sb.WriteString(cfg.Context)
-		sb.WriteString("\n")
-	}
-	if len(cfg.Rules) > 0 {
-		if cfg.Context != "" {
-			sb.WriteString("\n")
-		}
-		sb.WriteString("## Rules\n")
-		keys := make([]string, 0, len(cfg.Rules))
-		for k := range cfg.Rules {
-			keys = append(keys, k)
-		}
-		sort.Strings(keys)
-		for _, k := range keys {
-			sb.WriteString("\n### ")
-			sb.WriteString(k)
-			sb.WriteString("\n\n")
-			for _, item := range cfg.Rules[k] {
-				sb.WriteString("- ")
-				sb.WriteString(item)
-				sb.WriteString("\n")
-			}
-		}
-	}
-	return sb.String()
 }

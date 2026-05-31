@@ -60,28 +60,28 @@ The cursor SHALL be able to move through all items (active and archived) with `j
 - **THEN** the cursor does not change
 
 ### Requirement: Seleccionar un change con Enter
-Pressing `Enter` on an item SHALL close the index and open the selected change. If it is an active change, the mode switches to `ModeNormal` with that active change. If it is an archived change, the mode switches to `ModeViewingArchive` with that archived change.
+Pressing `Enter` on an item or left-clicking an already-selected item SHALL close the index and open the selected change. If it is an active change, the mode switches to `ModeNormal` with that active change. If it is an archived change, the mode switches to `ModeViewingArchive` with that archived change.
 
 #### Scenario: Seleccionar change activo
-- **WHEN** the cursor is on an active change and the user presses `Enter`
+- **WHEN** the cursor is on an active change and the user presses `Enter` or left-clicks on it (when already selected)
 - **THEN** the mode switches to `ModeNormal` showing that change
 
 #### Scenario: Seleccionar change archivado
-- **WHEN** the cursor is on an archived change and the user presses `Enter`
+- **WHEN** the cursor is on an archived change and the user presses `Enter` or left-clicks on it (when already selected)
 - **THEN** the mode switches to `ModeViewingArchive` showing the artifacts of that archived change
 
 ### Requirement: Helpbar del índice
 The helpbar in `ModeIndex` SHALL show navigation hints and SHALL reflect the current sort mode via the `s` binding label:
-- When sort mode is **name**: `j/k: navigate  Enter: open  Space: expand  s: sort by suffix  Esc: quit`
-- When sort mode is **suffix**: `j/k: navigate  Enter: open  Space: expand  s: sort by name  Esc: quit`
+- When sort mode is **name**: `j/k: navigate  Enter: open  Space: expand  click: select  s: sort by suffix  Esc: quit`
+- When sort mode is **suffix**: `j/k: navigate  Enter: open  Space: expand  click: select  s: sort by name  Esc: quit`
 
 #### Scenario: Helpbar en modo sort normal
 - **WHEN** the mode is `ModeIndex` and the sort order is **name**
-- **THEN** the helpbar shows `j/k: navigate  Enter: open  Space: expand  s: sort by suffix  Esc: quit`
+- **THEN** the helpbar shows `j/k: navigate  Enter: open  Space: expand  click: select  s: sort by suffix  Esc: quit`
 
 #### Scenario: Helpbar en modo sort por sufijo
 - **WHEN** the mode is `ModeIndex` and the sort order is **suffix**
-- **THEN** the helpbar shows `j/k: navigate  Enter: open  Space: expand  s: sort by name  Esc: quit`
+- **THEN** the helpbar shows `j/k: navigate  Enter: open  Space: expand  click: select  s: sort by name  Esc: quit`
 
 ### Requirement: Actualización en tiempo real del índice
 While the mode is `ModeIndex`, the TUI SHALL detect on each tick (≤ 500 ms) whether the list of active changes, the list of archived changes, or the list of project specs has changed on disk. If any structural change is detected, the index SHALL reload all three lists, rebuild the navigable items, and refresh the viewport without the user having to leave and re-enter `ModeIndex`. Additionally, when no structural change is detected, the TUI SHALL reload the task content of each active change from disk and, if any task content has changed, SHALL rebuild the index items and refresh the viewport so that progress bars reflect the latest task completion state. The cursor SHALL be preserved if the resulting index has at least as many items as the current position; otherwise it SHALL move to the last available item.

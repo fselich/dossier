@@ -1,8 +1,6 @@
 package ui
 
 import (
-	"os"
-	"os/exec"
 	"time"
 
 	"charm.land/bubbles/v2/viewport"
@@ -64,31 +62,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case editorReturnMsg:
 		ch := m.current()
 		if ch != nil {
-			fresh := openspec.ReloadChange(*ch)
 			var cursorText string
-			if m.taskCursor < len(m.taskItems) && m.taskItems[m.taskCursor].Kind == openspec.KindTask {
-				cursorText = m.taskItems[m.taskCursor].Text
+			if m.tasks.Cursor < len(m.tasks.Items) && m.tasks.Items[m.tasks.Cursor].Kind == openspec.KindTask {
+				cursorText = m.tasks.Items[m.tasks.Cursor].Text
 			}
-			if fresh.Tasks.Present != ch.Tasks.Present || fresh.Tasks.Content != ch.Tasks.Content {
-				m.project.Changes[m.changeIdx].Tasks = fresh.Tasks
-				m.taskItems = openspec.ParseTasks(fresh.Tasks.Content)
-				m.taskCursor = openspec.FindCursorByText(m.taskItems, cursorText)
-			}
-			if fresh.Proposal.Present != ch.Proposal.Present || fresh.Proposal.Content != ch.Proposal.Content {
-				m.project.Changes[m.changeIdx].Proposal = fresh.Proposal
-				delete(m.renderCache, TabProposal)
-			}
-			if fresh.Design.Present != ch.Design.Present || fresh.Design.Content != ch.Design.Content {
-				m.project.Changes[m.changeIdx].Design = fresh.Design
-				delete(m.renderCache, TabDesign)
-			}
-			if fresh.Specs.Present != ch.Specs.Present || fresh.Specs.Content != ch.Specs.Content {
-				m.project.Changes[m.changeIdx].Specs = fresh.Specs
-				m.project.Changes[m.changeIdx].SpecFiles = fresh.SpecFiles
-				if m.specIdx >= len(fresh.SpecFiles) {
-					m.specIdx = 0
-				}
-				delete(m.renderCache, TabSpecs)
+			fresh := m.loader.ReloadChange(*ch)
+			tasksChanged, _ := m.mergeReloadedChange(fresh)
+			if tasksChanged {
+				m.tasks.Cursor = openspec.FindCursorByText(m.tasks.Items, cursorText)
 			}
 		}
 		return m, m.loadViewport()
@@ -104,288 +85,26 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleMouseClick(msg)
 
 	case tea.KeyPressMsg:
-		switch msg.String() {
-		case "q", "ctrl+c":
-			if m.mode == ModeViewingConfig {
-				m.mode = m.prevMode
-				m.vp.SetHeight(m.contentHeight())
-				return m, m.loadViewport()
-			}
-			return m, tea.Quit
-
-		case "i":
-			if m.mode == ModeIndex || m.mode == ModeNormal {
-				m.prevMode = m.mode
-				m.mode = ModeViewingConfig
-				m.vp.SetHeight(m.contentHeight())
-				return m, m.loadViewport()
-			}
-
-		case "a":
-			if m.mode == ModeNormal || m.mode == ModeViewingArchive {
-				m.enterIndex()
-			}
-
-		case "esc":
-			switch m.mode {
-			case ModeViewingConfig:
-				m.mode = m.prevMode
-				m.vp.SetHeight(m.contentHeight())
-				return m, m.loadViewport()
-			case ModeNormal, ModeViewingArchive:
-				m.enterIndex()
-			case ModeIndex:
-				return m, tea.Quit
-			case ModeViewingSpec:
-				specIdx := m.specViewerCursor
-				jumpTarget := m.specJumpTarget
-				wasFocusMode := m.specFocusMode
-				m.enterIndex()
-				if wasFocusMode && jumpTarget != "" {
-					m.expandedSpecs[specIdx] = true
-					m.buildIndexItems()
-					for j, it := range m.indexItems {
-						if it.kind == indexKindRequirement && it.idx == specIdx &&
-							it.reqIdx < len(m.projectSpecs[specIdx].RequirementNames) &&
-							m.projectSpecs[specIdx].RequirementNames[it.reqIdx] == jumpTarget {
-							m.indexCursor = j
-							break
-						}
-					}
-				} else {
-					for i, item := range m.indexItems {
-						if item.kind == indexKindSpec && item.idx == specIdx {
-							m.indexCursor = i
-							break
-						}
-					}
-				}
-				m.refreshIndexViewport()
-			}
-
-		case "enter":
-			if m.mode == ModeIndex && len(m.indexItems) > 0 {
-				item := m.indexItems[m.indexCursor]
-				m.renderCache = make(map[Tab]string)
-				if item.kind == indexKindActive {
-					m.changeIdx = item.idx
-					m.mode = ModeNormal
-					m.tab = m.defaultTab()
-					m.loadTaskItems()
-					m.vp.SetHeight(m.contentHeight())
-					return m, m.loadViewport()
-				}
-				if item.kind == indexKindSpec {
-					m.specViewerCursor = item.idx
-					m.specJumpTarget = ""
-					m.specFocusMode = false
-					m.specReqCursor = 0
-					m.mode = ModeViewingSpec
-					m.vp.SetHeight(m.contentHeight())
-					return m, m.loadViewport()
-				}
-				if item.kind == indexKindRequirement {
-					m.specViewerCursor = item.idx
-					m.specJumpTarget = m.projectSpecs[item.idx].RequirementNames[item.reqIdx]
-					m.specFocusMode = true
-					m.specReqCursor = item.reqIdx
-					m.mode = ModeViewingSpec
-					m.vp.SetHeight(m.contentHeight())
-					return m, m.loadViewport()
-				}
-				m.archiveCursor = item.idx
-				m.tab = firstAvailableTab(m.archiveChanges[item.idx])
-				m.mode = ModeViewingArchive
-				m.vp.SetHeight(m.contentHeight())
-				return m, m.loadViewport()
-			}
-
-		case "h":
-			if m.mode == ModeViewingSpec && m.specFocusMode {
-				ps := m.projectSpecs[m.specViewerCursor]
-				if len(ps.RequirementNames) > 0 {
-					m.specReqCursor = (m.specReqCursor - 1 + len(ps.RequirementNames)) % len(ps.RequirementNames)
-					m.specJumpTarget = ps.RequirementNames[m.specReqCursor]
-					return m, m.loadViewport()
-				}
-			}
-			if m.mode == ModeNormal && len(m.project.Changes) > 0 {
-				m.changeIdx = (m.changeIdx - 1 + len(m.project.Changes)) % len(m.project.Changes)
-				m.renderCache = make(map[Tab]string)
-				m.loadTaskItems()
-				m.tab = m.defaultTab()
-				m.specIdx = 0
-				m.vp.SetHeight(m.contentHeight())
-				return m, m.loadViewport()
-			}
-
-		case "l":
-			if m.mode == ModeViewingSpec && m.specFocusMode {
-				ps := m.projectSpecs[m.specViewerCursor]
-				if len(ps.RequirementNames) > 0 {
-					m.specReqCursor = (m.specReqCursor + 1) % len(ps.RequirementNames)
-					m.specJumpTarget = ps.RequirementNames[m.specReqCursor]
-					return m, m.loadViewport()
-				}
-			}
-			if m.mode == ModeNormal && len(m.project.Changes) > 0 {
-				m.changeIdx = (m.changeIdx + 1) % len(m.project.Changes)
-				m.renderCache = make(map[Tab]string)
-				m.loadTaskItems()
-				m.tab = m.defaultTab()
-				m.specIdx = 0
-				m.vp.SetHeight(m.contentHeight())
-				return m, m.loadViewport()
-			}
-
-		case "1":
-			if m.tabAvailable(TabProposal) {
-				m.tab = TabProposal
-				m.vp.SetHeight(m.contentHeight())
-				return m, m.loadViewport()
-			}
-		case "2":
-			if m.tabAvailable(TabDesign) {
-				m.tab = TabDesign
-				m.vp.SetHeight(m.contentHeight())
-				return m, m.loadViewport()
-			}
-		case "3":
-			if m.mode != ModeIndex && m.tabAvailable(TabSpecs) {
-				if m.tab == TabSpecs {
-					ch := m.current()
-					if ch != nil && len(ch.SpecFiles) > 1 {
-						m.specIdx = (m.specIdx + 1) % len(ch.SpecFiles)
-						delete(m.renderCache, TabSpecs)
-					}
-				} else {
-					m.tab = TabSpecs
-					m.specIdx = 0
-				}
-				m.vp.SetHeight(m.contentHeight())
-				return m, m.loadViewport()
-			}
-		case "4":
-			if m.mode != ModeIndex && m.tabAvailable(TabTasks) {
-				m.tab = TabTasks
-				m.vp.SetHeight(m.contentHeight())
-				return m, m.loadViewport()
-			}
-
-		case "tab":
-			if m.mode == ModeNormal || m.mode == ModeViewingArchive {
-				nxt := m.nextAvailableTab(m.tab, 1)
-				if nxt != m.tab {
-					m.tab = nxt
-					m.vp.SetHeight(m.contentHeight())
-					return m, m.loadViewport()
-				}
-			}
-		case "shift+tab":
-			if m.mode == ModeNormal || m.mode == ModeViewingArchive {
-				prv := m.nextAvailableTab(m.tab, -1)
-				if prv != m.tab {
-					m.tab = prv
-					m.vp.SetHeight(m.contentHeight())
-					return m, m.loadViewport()
-				}
-			}
-
-		case "j", "down":
-			switch m.mode {
-			case ModeIndex:
-				if m.indexCursor < len(m.indexItems)-1 {
-					m.indexCursor++
-				}
-				m.refreshIndexViewport()
-			default:
-				if m.tab == TabTasks && m.mode == ModeNormal {
-					m.moveCursorDown()
-					m.refreshTasksViewport()
-				} else {
-					m.vp.ScrollDown(1)
-				}
-			}
-
-		case "k", "up":
-			switch m.mode {
-			case ModeIndex:
-				if m.indexCursor > 0 {
-					m.indexCursor--
-				}
-				m.refreshIndexViewport()
-			default:
-				if m.tab == TabTasks && m.mode == ModeNormal {
-					m.moveCursorUp()
-					m.refreshTasksViewport()
-				} else {
-					m.vp.ScrollUp(1)
-				}
-			}
-
-		case "space":
-			if m.mode == ModeNormal && m.tab == TabTasks {
-				return m, m.doToggle()
-			}
-			if m.mode == ModeIndex && len(m.indexItems) > 0 {
-				item := m.indexItems[m.indexCursor]
-				if item.kind == indexKindSpec {
-					specIdx := item.idx
-					m.expandedSpecs[specIdx] = !m.expandedSpecs[specIdx]
-					m.buildIndexItems()
-					m.indexCursor = 0
-					for i, it := range m.indexItems {
-						if it.kind == indexKindSpec && it.idx == specIdx {
-							m.indexCursor = i
-							break
-						}
-					}
-					if m.indexCursor >= len(m.indexItems) {
-						m.indexCursor = max(0, len(m.indexItems)-1)
-					}
-					m.refreshIndexViewport()
-				}
-			}
-
-		case "s":
-			if m.mode == ModeIndex {
-				savedKind := indexKindActive
-				savedIdx := -1
-				savedReqIdx := 0
-				if m.indexCursor < len(m.indexItems) {
-					item := m.indexItems[m.indexCursor]
-					savedKind = item.kind
-					savedIdx = item.idx
-					savedReqIdx = item.reqIdx
-				}
-				m.specSortBySuffix = !m.specSortBySuffix
-				m.buildIndexItems()
-				if savedIdx >= 0 {
-					for i, it := range m.indexItems {
-						if it.kind == savedKind && it.idx == savedIdx && it.reqIdx == savedReqIdx {
-							m.indexCursor = i
-							break
-						}
-					}
-				}
-				m.refreshIndexViewport()
-			}
-
-		case "e":
-			if m.mode == ModeNormal && m.tabAvailable(m.tab) {
-				path := m.artifactPath()
-				if path != "" {
-					editor := os.Getenv("EDITOR")
-					if editor == "" {
-						editor = "vi"
-					}
-					cmd := exec.Command(editor, path)
-					return m, tea.ExecProcess(cmd, func(err error) tea.Msg {
-						return editorReturnMsg{}
-					})
-				}
-			}
-		}
+		return m.dispatchKey(msg)
 	}
 	return m, nil
+}
+
+func (m Model) dispatchKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	switch m.mode {
+	case ModeNormal, ModeViewingArchive:
+		return m.updateViewer(msg)
+	case ModeIndex:
+		return m.updateIndex(msg)
+	case ModeViewingSpec:
+		return m.updateSpec(msg)
+	case ModeViewingConfig:
+		return m.updateConfig(msg)
+	}
+	return m, nil
+}
+
+func (m Model) commitStateChange() (tea.Model, tea.Cmd) {
+	m.vp.SetHeight(m.contentHeight())
+	return m, m.loadViewport()
 }

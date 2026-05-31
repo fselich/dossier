@@ -1,7 +1,6 @@
 package openspec
 
 import (
-	"os"
 	"regexp"
 	"strings"
 )
@@ -28,7 +27,7 @@ var (
 
 func ParseTasks(content string) []TaskItem {
 	lines := strings.Split(content, "\n")
-	var items []TaskItem
+	items := make([]TaskItem, 0, len(lines))
 	for i, line := range lines {
 		switch {
 		case rxSection.MatchString(line):
@@ -67,8 +66,8 @@ func FindCursorByText(items []TaskItem, text string) int {
 }
 
 // ToggleTask flips the done state of items[idx] in memory and on disk.
-func ToggleTask(path string, items []TaskItem, idx int) error {
-	data, err := os.ReadFile(path)
+func (l *Loader) ToggleTask(path string, items []TaskItem, idx int) error {
+	data, err := l.fs.ReadFile(path)
 	if err != nil {
 		return err
 	}
@@ -83,5 +82,10 @@ func ToggleTask(path string, items []TaskItem, idx int) error {
 		lines[items[idx].LineNum] = strings.Replace(lines[items[idx].LineNum], "- [ ] ", "- [x] ", 1)
 		items[idx].Done = true
 	}
-	return os.WriteFile(path, []byte(strings.Join(lines, "\n")), 0644)
+	return l.fs.WriteFile(path, []byte(strings.Join(lines, "\n")), 0644)
+}
+
+// ToggleTaskPackage is a package-level wrapper for ToggleTask.
+func ToggleTask(path string, items []TaskItem, idx int) error {
+	return defaultLoader.ToggleTask(path, items, idx)
 }
