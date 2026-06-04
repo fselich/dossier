@@ -21,11 +21,25 @@ builds:
     env:
       - CGO_ENABLED=0
     mod_timestamp: '{{ .CommitTimestamp }}'
+  -
+    id: dossier-darwin
+    main: ./cmd/dossier/main.go
+    binary: dossier
+    goos:
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X main.version={{ .Version }}
+    env:
+      - CGO_ENABLED=0
+    mod_timestamp: '{{ .CommitTimestamp }}'
 
 archives:
   -
     id: dossier-archive
-    builds: [dossier-linux]
+    builds: [dossier-linux, dossier-darwin]
     name_template: "{{ .ProjectName }}-{{ .Os }}-{{ .Arch }}"
     format: tar.gz
     files:
