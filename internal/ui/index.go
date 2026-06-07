@@ -274,6 +274,7 @@ func (m *Model) buildIndexItems() {
 }
 
 func (m *Model) refreshIndexViewport() {
+	m.vp.SetHeight(m.contentHeight())
 	content, cursorLine := m.renderIndexContent()
 	m.vp.SetContent(content)
 	if cursorLine < m.vp.YOffset() {

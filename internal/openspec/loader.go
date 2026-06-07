@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -350,6 +351,52 @@ func ExtractRequirement(raw, name string) string {
 	}
 	return strings.Join(block, "\n")
 }
+
+func ExtractPurpose(content string) string {
+	lines := strings.Split(content, "\n")
+	start := -1
+	for i, l := range lines {
+		if l == "## Purpose" {
+			start = i
+			break
+		}
+	}
+	if start < 0 {
+		return ""
+	}
+	var purposeLines []string
+	for _, l := range lines[start+1:] {
+		if strings.HasPrefix(l, "## ") {
+			break
+		}
+		trimmed := strings.TrimSpace(l)
+		if trimmed == "" {
+			continue
+		}
+		purposeLines = append(purposeLines, trimmed)
+	}
+	if len(purposeLines) == 0 {
+		return ""
+	}
+	text := strings.Join(purposeLines, " ")
+	text = stripMarkdown(text)
+	return text
+}
+
+func stripMarkdown(s string) string {
+	s = reBold.ReplaceAllString(s, "$1")
+	s = reItalic.ReplaceAllString(s, "$1")
+	s = reCode.ReplaceAllString(s, "$1")
+	s = reLink.ReplaceAllString(s, "$1")
+	return s
+}
+
+var (
+	reBold   = regexp.MustCompile(`\*\*(.+?)\*\*`)
+	reItalic = regexp.MustCompile(`\*(.+?)\*`)
+	reCode   = regexp.MustCompile("`(.+?)`")
+	reLink   = regexp.MustCompile(`\[(.+?)\]\(.+?\)`)
+)
 
 func ConfigToMarkdown(cfg ProjectConfig) string {
 	var sb strings.Builder

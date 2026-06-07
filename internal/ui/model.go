@@ -314,17 +314,37 @@ func (m *Model) currentArchive() *openspec.Change {
 }
 
 const (
-	chromeTop        = 1
-	chromeHeader     = 1
-	chromeTabBar     = 1
-	chromeInnerSep   = 1
-	chromeSpecSubnav = 1
-	chromeHelpBar    = 1
-	chromeBottom     = 1
+	chromeTop          = 1
+	chromeHeader       = 1
+	chromeTabBar       = 1
+	chromeInnerSep     = 1
+	chromeSpecSubnav   = 1
+	chromeSpecPreview  = 2
+	chromeHelpBar      = 1
+	chromeBottom       = 1
 )
 
+func (m *Model) isSpecPreviewVisible() bool {
+	if m.mode != ModeIndex || m.visibleItemCount() == 0 {
+		return false
+	}
+	item := m.index.Items[m.visibleItemIdx(m.index.Cursor)]
+	return item.kind == indexKindSpec || item.kind == indexKindRequirement
+}
+
 func (m *Model) contentHeight() int {
-	if m.mode == ModeIndex || m.mode == ModeViewingSpec || m.mode == ModeViewingConfig {
+	if m.mode == ModeIndex {
+		chrome := chromeTop + chromeHeader + chromeHelpBar + chromeBottom + 2*chromeInnerSep
+		if m.isSpecPreviewVisible() {
+			chrome += chromeSpecPreview + chromeInnerSep
+		}
+		h := m.height - chrome
+		if h < 1 {
+			h = 1
+		}
+		return h
+	}
+	if m.mode == ModeViewingSpec || m.mode == ModeViewingConfig {
 		h := m.height - (chromeTop + chromeHeader + chromeInnerSep + chromeInnerSep + chromeHelpBar + chromeBottom)
 		if h < 1 {
 			h = 1

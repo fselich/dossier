@@ -177,3 +177,29 @@ When a filter is applied or changed, the cursor SHALL be preserved on the same l
 #### Scenario: Cursor moves to first item when current item is filtered out
 - **WHEN** the cursor is on "auth" and the user types `/data`
 - **THEN** the cursor moves to the first matching item
+
+### Requirement: Vista de índice con spec preview bar
+The TUI SHALL add a persistent spec preview bar to the index chrome. The bar SHALL appear between the content area (viewport) and the helpbar, separated from both by horizontal separator lines. The bar SHALL always occupy 2 lines in the chrome, displaying the selected spec's name and purpose text with inline word-wrap to 2 lines. The viewport content height (`contentHeight`) SHALL be reduced to accommodate the bar when visible.
+
+#### Scenario: Preview bar visible in index
+- **WHEN** the mode is `ModeIndex`
+- **THEN** the screen shows a 2-line bar between the content area separator and the helpbar separator
+
+#### Scenario: Preview bar not present in other modes
+- **WHEN** the mode is `ModeNormal`, `ModeViewingArchive`, `ModeViewingSpec`, or `ModeViewingConfig`
+- **THEN** the spec preview bar is not rendered
+
+### Requirement: Preview bar content
+When the cursor is on an `indexKindSpec` or `indexKindRequirement` item in the index, the bar SHALL show the spec name followed by ` ┊ ` and the purpose text. The purpose text SHALL be the plain text extracted from between `## Purpose` and the next `##` heading in the spec's `Content`, with markdown syntax stripped. The combined text SHALL wrap to a second line if it exceeds the available width, and be truncated with `…` on the second line if still overflowing. When the cursor is on any other item type (active change, archived change), the bar SHALL be hidden.
+
+#### Scenario: Cursor on spec shows name and purpose
+- **WHEN** the cursor is on a spec item
+- **THEN** the bar shows `<spec-name> ┊ <purpose text>` with inline word-wrap to 2 lines
+
+#### Scenario: Cursor on requirement shows same spec info
+- **WHEN** the cursor is on a requirement item within a spec
+- **THEN** the bar shows the same content as if the parent spec were selected
+
+#### Scenario: Cursor on active or archived item hides bar
+- **WHEN** the cursor is on an active change or an archived change
+- **THEN** the spec preview bar is not rendered (no gap in the chrome)

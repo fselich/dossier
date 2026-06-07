@@ -40,6 +40,9 @@ var (
 	taskPendingStyle = lipgloss.NewStyle().
 				Foreground(lipgloss.Color("7"))
 
+	specPreviewStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("7"))
+
 	helpStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("8"))
 

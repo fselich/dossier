@@ -459,3 +459,49 @@ func TestReloadChange(t *testing.T) {
 		}
 	})
 }
+
+func TestExtractPurpose(t *testing.T) {
+	t.Run("purpose present", func(t *testing.T) {
+		content := "# spec\n\n## Purpose\nDefines the layout.\n\n## Requirements\n"
+		got := ExtractPurpose(content)
+		want := "Defines the layout."
+		if got != want {
+			t.Errorf("got %q, want %q", got, want)
+		}
+	})
+
+	t.Run("no purpose heading", func(t *testing.T) {
+		content := "# spec\n\n## Requirements\n"
+		got := ExtractPurpose(content)
+		if got != "" {
+			t.Errorf("expected empty, got %q", got)
+		}
+	})
+
+	t.Run("purpose at EOF", func(t *testing.T) {
+		content := "# spec\n\n## Purpose\nDefines the layout and main behavior."
+		got := ExtractPurpose(content)
+		want := "Defines the layout and main behavior."
+		if got != want {
+			t.Errorf("got %q, want %q", got, want)
+		}
+	})
+
+	t.Run("multi-line purpose", func(t *testing.T) {
+		content := "# spec\n\n## Purpose\nDefines the layout.\nMain behavior.\n\n## Requirements\n"
+		got := ExtractPurpose(content)
+		want := "Defines the layout. Main behavior."
+		if got != want {
+			t.Errorf("got %q, want %q", got, want)
+		}
+	})
+
+	t.Run("markdown stripped from purpose", func(t *testing.T) {
+		content := "# spec\n\n## Purpose\n**Bold** and *italic* and `code` and [link](url).\n\n## Requirements\n"
+		got := ExtractPurpose(content)
+		want := "Bold and italic and code and link."
+		if got != want {
+			t.Errorf("got %q, want %q", got, want)
+		}
+	})
+}

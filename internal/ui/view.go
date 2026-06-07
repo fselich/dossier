@@ -33,10 +33,18 @@ func (m *Model) viewContentWithChrome() string {
 		m.addBorderSides(m.renderHeader()),
 		m.boxInnerSep(),
 		m.addBorderSides(m.vp.View()),
+	}
+	if preview, ok := m.renderSpecPreview(); ok {
+		rows = append(rows,
+			m.boxInnerSep(),
+			m.addBorderSides(preview),
+		)
+	}
+	rows = append(rows,
 		m.boxInnerSep(),
 		m.addBorderSides(m.renderHelpBar()),
 		m.boxBottom(),
-	}
+	)
 	return strings.Join(rows, "\n")
 }
 
@@ -177,6 +185,94 @@ func (m *Model) addBorderSides(content string) string {
 		result = append(result, separatorStyle.Render("│")+line+strings.Repeat(" ", pad)+separatorStyle.Render("│"))
 	}
 	return strings.Join(result, "\n")
+}
+
+func (m *Model) renderSpecPreview() (string, bool) {
+	if m.mode != ModeIndex {
+		return "", false
+	}
+	if m.visibleItemCount() == 0 {
+		return "", false
+	}
+	item := m.index.Items[m.visibleItemIdx(m.index.Cursor)]
+
+	var specName string
+	var specContent string
+
+	switch item.kind {
+	case indexKindSpec, indexKindRequirement:
+		if item.idx < len(m.projectSpecs) {
+			specName = m.projectSpecs[item.idx].Name
+			specContent = m.projectSpecs[item.idx].Content
+		}
+	default:
+		return "", false
+	}
+
+	if specName == "" {
+		return "", false
+	}
+
+	purpose := openspec.ExtractPurpose(specContent)
+	available := m.width - 4
+
+	var text string
+	if purpose == "" {
+		text = specName
+	} else {
+		text = specName + " ┊ " + purpose
+	}
+
+	pad := " "
+	render := func(s string) string {
+		return specPreviewStyle.Render(pad + s)
+	}
+
+	if lipgloss.Width(text) <= available {
+		return render(text), true
+	}
+
+	line1 := takePrefix(text, available)
+	rest := text[len(line1):]
+	line2 := rest
+	if lipgloss.Width(rest) > available {
+		line2 = truncateText(rest, available)
+	}
+
+	return render(line1) + "\n" + render(line2), true
+}
+
+func takePrefix(s string, maxWidth int) string {
+	runes := []rune(s)
+	w := 0
+	idx := 0
+	for i, r := range runes {
+		rw := lipgloss.Width(string(r))
+		if w+rw > maxWidth {
+			break
+		}
+		w += rw
+		idx = i + 1
+	}
+	return string(runes[:idx])
+}
+
+func truncateText(s string, maxWidth int) string {
+	if lipgloss.Width(s) <= maxWidth {
+		return s
+	}
+	runes := []rune(s)
+	w := 0
+	idx := 0
+	for i, r := range runes {
+		rw := lipgloss.Width(string(r))
+		if w+rw > maxWidth-1 {
+			break
+		}
+		w += rw
+		idx = i + 1
+	}
+	return string(runes[:idx]) + "…"
 }
 
 func (m *Model) renderHelpBar() string {
