@@ -307,7 +307,11 @@ func (m *Model) renderIndexContent() (string, int) {
 
 	sb.WriteString("\n")
 	line++
-	sb.WriteString("  " + sectionStyle.Render("Active Changes") + "\n\n")
+	activeTitle := "Active Changes"
+	if n := len(m.project.Changes); n > 0 {
+		activeTitle = fmt.Sprintf("Active Changes (%d)", n)
+	}
+	sb.WriteString("  " + sectionStyle.Render(activeTitle) + "\n\n")
 	line += 2
 
 	if len(m.project.Changes) == 0 {
@@ -337,7 +341,11 @@ func (m *Model) renderIndexContent() (string, int) {
 	sb.WriteString("\n")
 	line++
 
-	sb.WriteString("  " + sectionStyle.Render("Specifications") + "\n\n")
+	specTitle := "Specifications"
+	if n := len(m.projectSpecs); n > 0 {
+		specTitle = fmt.Sprintf("Specifications (%d)", n)
+	}
+	sb.WriteString("  " + sectionStyle.Render(specTitle) + "\n\n")
 	line += 2
 
 	if len(m.projectSpecs) == 0 {
@@ -399,7 +407,11 @@ func (m *Model) renderIndexContent() (string, int) {
 	sb.WriteString("\n")
 	line++
 
-	sb.WriteString("  " + sectionStyle.Render("Archived Changes") + "\n\n")
+	archivedTitle := "Archived Changes"
+	if n := len(m.index.ArchiveChanges); n > 0 {
+		archivedTitle = fmt.Sprintf("Archived Changes (%d)", n)
+	}
+	sb.WriteString("  " + sectionStyle.Render(archivedTitle) + "\n\n")
 	line += 2
 
 	if len(m.index.ArchiveChanges) == 0 {

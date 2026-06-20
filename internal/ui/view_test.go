@@ -266,6 +266,145 @@ func TestUpdateKeyPresses(t *testing.T) {
 	})
 }
 
+func TestMoveCursorOnSections(t *testing.T) {
+	t.Run("moveCursorUp goes to section header", func(t *testing.T) {
+		m := &Model{
+			tasks: taskState{
+				Items: []openspec.TaskItem{
+					{Kind: openspec.KindSection, Text: "Section 1"},
+					{Kind: openspec.KindTask, Text: "do thing"},
+				},
+				Cursor: 1,
+			},
+		}
+		m.moveCursorUp()
+		if m.tasks.Cursor != 0 {
+			t.Errorf("expected cursor at section header (0), got %d", m.tasks.Cursor)
+		}
+	})
+
+	t.Run("moveCursorDown goes to section header", func(t *testing.T) {
+		m := &Model{
+			tasks: taskState{
+				Items: []openspec.TaskItem{
+					{Kind: openspec.KindTask, Text: "do thing"},
+					{Kind: openspec.KindSection, Text: "Section 2"},
+				},
+				Cursor: 0,
+			},
+		}
+		m.moveCursorDown()
+		if m.tasks.Cursor != 1 {
+			t.Errorf("expected cursor at section header (1), got %d", m.tasks.Cursor)
+		}
+	})
+
+	t.Run("moveCursorUp stops at first item", func(t *testing.T) {
+		m := &Model{
+			tasks: taskState{
+				Items: []openspec.TaskItem{
+					{Kind: openspec.KindSection, Text: "Section 1"},
+					{Kind: openspec.KindTask, Text: "do thing"},
+				},
+				Cursor: 0,
+			},
+		}
+		m.moveCursorUp()
+		if m.tasks.Cursor != 0 {
+			t.Errorf("expected cursor to stay at 0, got %d", m.tasks.Cursor)
+		}
+	})
+
+	t.Run("moveCursorDown stops at last item", func(t *testing.T) {
+		m := &Model{
+			tasks: taskState{
+				Items: []openspec.TaskItem{
+					{Kind: openspec.KindTask, Text: "do thing"},
+					{Kind: openspec.KindSection, Text: "Section 2"},
+				},
+				Cursor: 1,
+			},
+		}
+		m.moveCursorDown()
+		if m.tasks.Cursor != 1 {
+			t.Errorf("expected cursor to stay at 1, got %d", m.tasks.Cursor)
+		}
+	})
+
+	t.Run("moveCursorUp then down navigates through sections and tasks", func(t *testing.T) {
+		m := &Model{
+			tasks: taskState{
+				Items: []openspec.TaskItem{
+					{Kind: openspec.KindSection, Text: "S1"},
+					{Kind: openspec.KindTask, Text: "T1"},
+					{Kind: openspec.KindTask, Text: "T2"},
+					{Kind: openspec.KindSection, Text: "S2"},
+					{Kind: openspec.KindTask, Text: "T3"},
+				},
+				Cursor: 2,
+			},
+		}
+		m.moveCursorDown() // T2 -> S2
+		if m.tasks.Cursor != 3 {
+			t.Errorf("expected cursor at section S2 (3), got %d", m.tasks.Cursor)
+		}
+		m.moveCursorDown() // S2 -> T3
+		if m.tasks.Cursor != 4 {
+			t.Errorf("expected cursor at T3 (4), got %d", m.tasks.Cursor)
+		}
+		m.moveCursorUp() // T3 -> S2
+		if m.tasks.Cursor != 3 {
+			t.Errorf("expected cursor back at section S2 (3), got %d", m.tasks.Cursor)
+		}
+		m.moveCursorUp() // S2 -> T2
+		if m.tasks.Cursor != 2 {
+			t.Errorf("expected cursor back at T2 (2), got %d", m.tasks.Cursor)
+		}
+	})
+}
+
+func TestRenderCursorOnSectionHeader(t *testing.T) {
+	t.Run("cursor on section shows ▶ mark", func(t *testing.T) {
+		m := &Model{
+			width: 80,
+			tasks: taskState{
+				Items: []openspec.TaskItem{
+					{Kind: openspec.KindSection, Text: "Section 1"},
+					{Kind: openspec.KindTask, Text: "do thing", Done: false},
+				},
+				Cursor: 0,
+			},
+		}
+		content, cursorLine := m.renderTasksContent()
+		if !strings.Contains(content, "▶") {
+			t.Error("expected cursor indicator (▶) in content for section header")
+		}
+		if cursorLine < 0 {
+			t.Errorf("expected non-negative cursor line, got %d", cursorLine)
+		}
+	})
+
+	t.Run("cursor on task still works", func(t *testing.T) {
+		m := &Model{
+			width: 80,
+			tasks: taskState{
+				Items: []openspec.TaskItem{
+					{Kind: openspec.KindSection, Text: "Section 1"},
+					{Kind: openspec.KindTask, Text: "do thing", Done: false},
+				},
+				Cursor: 1,
+			},
+		}
+		content, cursorLine := m.renderTasksContent()
+		if cursorLine == 0 {
+			t.Error("expected non-zero cursor line for task")
+		}
+		if !strings.Contains(content, "▶") {
+			t.Error("expected cursor indicator (▶) in content for task")
+		}
+	})
+}
+
 func TestToggleTask(t *testing.T) {
 	t.Run("toggle pending to done writes to disk", func(t *testing.T) {
 		dir := t.TempDir()
@@ -299,6 +438,19 @@ func TestToggleTask(t *testing.T) {
 		cmd := m.doToggle()
 		if cmd != nil {
 			t.Error("expected nil command for empty items")
+		}
+	})
+
+	t.Run("toggle on section header returns nil", func(t *testing.T) {
+		m := &Model{
+			tasks: taskState{
+				Items:  []openspec.TaskItem{{Kind: openspec.KindSection, Text: "Section 1"}},
+				Cursor: 0,
+			},
+		}
+		cmd := m.doToggle()
+		if cmd != nil {
+			t.Error("expected nil command for section header")
 		}
 	})
 }
@@ -654,8 +806,8 @@ func TestIndexFilteredNavigation(t *testing.T) {
 				{kind: indexKindActive, idx: 0},
 				{kind: indexKindActive, idx: 1},
 			},
-			Cursor:      0,
-			FilterText:  "data",
+			Cursor:       0,
+			FilterText:   "data",
 			FilterActive: false,
 		},
 	}

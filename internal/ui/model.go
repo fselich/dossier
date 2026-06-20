@@ -65,10 +65,10 @@ type indexState struct {
 	ArchiveChanges []openspec.Change
 	ArchiveCursor  int
 
-	FilterText       string
-	FilterActive     bool
-	FilterIndices    []int
-	PrevFilterText   string
+	FilterText     string
+	FilterActive   bool
+	FilterIndices  []int
+	PrevFilterText string
 }
 
 type specViewerState struct {

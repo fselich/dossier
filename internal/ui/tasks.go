@@ -42,20 +42,14 @@ func (m *Model) firstTaskIdx() int {
 }
 
 func (m *Model) moveCursorDown() {
-	for i := m.tasks.Cursor + 1; i < len(m.tasks.Items); i++ {
-		if m.tasks.Items[i].Kind == openspec.KindTask {
-			m.tasks.Cursor = i
-			return
-		}
+	if m.tasks.Cursor < len(m.tasks.Items)-1 {
+		m.tasks.Cursor++
 	}
 }
 
 func (m *Model) moveCursorUp() {
-	for i := m.tasks.Cursor - 1; i >= 0; i-- {
-		if m.tasks.Items[i].Kind == openspec.KindTask {
-			m.tasks.Cursor = i
-			return
-		}
+	if m.tasks.Cursor > 0 {
+		m.tasks.Cursor--
 	}
 }
 
@@ -131,8 +125,15 @@ func (m *Model) renderTasksContent() (string, int) {
 				sb.WriteString("\n")
 				line++
 			}
+			if i == m.tasks.Cursor {
+				cursorLine = line
+			}
+			prefix := "  "
+			if i == m.tasks.Cursor {
+				prefix = taskCursorMarkStyle.Render("▶") + " "
+			}
 			done, total := sectionProgress(m.tasks.Items, i)
-			sectionLine := sectionStyle.Render("  "+item.Text) + "  " + progressBar(done, total, 5)
+			sectionLine := sectionStyle.Render(prefix+item.Text) + "  " + progressBar(done, total, 5)
 			sb.WriteString(sectionLine + "\n")
 			line += lipgloss.Height(sectionLine)
 			sb.WriteString("\n")
