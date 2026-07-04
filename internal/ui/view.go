@@ -191,7 +191,7 @@ func (m *Model) renderHelpBar() string {
 		if m.index.SortBySuffix {
 			sortHint = "s: sort by name"
 		}
-		text := "j/k: navigate  Enter: open  Space: expand  click: select  " + sortHint + "  i: info  Esc: quit"
+		text := "j/k: navigate  Enter: open  Space: toggle  click: select  " + sortHint + "  i: info  Esc: quit"
 		if m.index.FilterText != "" {
 			text += "  [/" + m.index.FilterText + "]"
 		}

@@ -57,13 +57,14 @@ type renderedConfigMsg struct {
 type tickMsg time.Time
 
 type indexState struct {
-	Items          []indexItem
-	Cursor         int
-	ExpandedSpecs  map[int]bool
-	SortBySuffix   bool
-	Order          []int
-	ArchiveChanges []openspec.Change
-	ArchiveCursor  int
+	Items             []indexItem
+	Cursor            int
+	ExpandedSpecs     map[int]bool
+	CollapsedSections [3]bool
+	SortBySuffix      bool
+	Order             []int
+	ArchiveChanges    []openspec.Change
+	ArchiveCursor     int
 
 	FilterText     string
 	FilterActive   bool
@@ -90,11 +91,24 @@ const (
 	indexKindArchived
 	indexKindSpec
 	indexKindRequirement
+	indexKindSection
 )
+
+const (
+	sectionActive   = 0
+	sectionSpecs    = 1
+	sectionArchived = 2
+)
+
+var sectionNames = []string{
+	sectionActive:   "Active Changes",
+	sectionSpecs:    "Specifications",
+	sectionArchived: "Archived Changes",
+}
 
 type indexItem struct {
 	kind   indexItemKind
-	idx    int // into project.Changes (active), archiveChanges (archived), or projectSpecs (spec/requirement)
+	idx    int // into project.Changes (active), archiveChanges (archived), projectSpecs (spec/requirement), or section (section)
 	reqIdx int // index into projectSpecs[idx].RequirementNames; only used for indexKindRequirement
 }
 

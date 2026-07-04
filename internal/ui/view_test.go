@@ -122,17 +122,20 @@ func TestBuildIndexItems(t *testing.T) {
 			{Name: "old-feat", DisplayDate: "01/05/2026"},
 		}
 		m.buildIndexItems()
-		if len(m.index.Items) != 4 {
-			t.Fatalf("expected 4 index items (2 active + 1 spec + 1 archive), got %d", len(m.index.Items))
+		if len(m.index.Items) != 7 {
+			t.Fatalf("expected 7 items (3 sections + 2 active + 1 spec + 1 archive), got %d", len(m.index.Items))
 		}
-		if m.index.Items[0].kind != indexKindActive {
-			t.Error("expected first item to be active change")
+		if m.index.Items[0].kind != indexKindSection {
+			t.Error("expected first item to be section")
 		}
-		if m.index.Items[2].kind != indexKindSpec {
-			t.Error("expected third item to be spec")
+		if m.index.Items[1].kind != indexKindActive {
+			t.Error("expected second item to be active change")
 		}
-		if m.index.Items[3].kind != indexKindArchived {
-			t.Error("expected fourth item to be archived")
+		if m.index.Items[4].kind != indexKindSpec {
+			t.Error("expected fifth item to be spec")
+		}
+		if m.index.Items[6].kind != indexKindArchived {
+			t.Error("expected seventh item to be archived")
 		}
 	})
 
@@ -142,8 +145,267 @@ func TestBuildIndexItems(t *testing.T) {
 		}
 		empty.index.ExpandedSpecs = make(map[int]bool)
 		empty.buildIndexItems()
-		if len(empty.index.Items) != 0 {
-			t.Errorf("expected 0 items, got %d", len(empty.index.Items))
+		if len(empty.index.Items) != 3 {
+			t.Errorf("expected 3 section items, got %d", len(empty.index.Items))
+		}
+		for _, it := range empty.index.Items {
+			if it.kind != indexKindSection {
+				t.Error("expected all items to be section kinds")
+			}
+		}
+	})
+}
+
+func TestCollapsedSections(t *testing.T) {
+	t.Run("collapsing section hides its children from item list", func(t *testing.T) {
+		m := &Model{
+			project: &openspec.Project{
+				Changes: []openspec.Change{{Name: "feature-a"}, {Name: "feature-b"}},
+			},
+			projectSpecs: []openspec.ProjectSpec{
+				{Name: "auth", RequirementCount: 1, RequirementNames: []string{"Login"}},
+			},
+			index: indexState{
+				ExpandedSpecs: make(map[int]bool),
+				ArchiveChanges: []openspec.Change{
+					{Name: "old-feat", DisplayDate: "01/05/2026"},
+				},
+			},
+		}
+		m.buildIndexItems()
+		if len(m.index.Items) != 7 {
+			t.Fatalf("expected 7 items (3 sections + 4 children), got %d", len(m.index.Items))
+		}
+
+		m.index.CollapsedSections[sectionActive] = true
+		m.buildIndexItems()
+		if len(m.index.Items) != 5 {
+			t.Fatalf("expected 5 items after collapsing active (3 sections + 1 spec + 1 archive), got %d", len(m.index.Items))
+		}
+		for _, it := range m.index.Items {
+			if it.kind == indexKindActive {
+				t.Error("expected no active items when section is collapsed")
+			}
+		}
+	})
+
+	t.Run("Space on section toggles collapse state", func(t *testing.T) {
+		m := Model{
+			mode:  ModeIndex,
+			width: 80,
+			project: &openspec.Project{
+				Changes: []openspec.Change{{Name: "feature-a"}},
+			},
+			index: indexState{
+				ExpandedSpecs: make(map[int]bool),
+			},
+		}
+		m.buildIndexItems()
+		m.vp = viewport.New(viewport.WithWidth(80), viewport.WithHeight(20))
+		m.vpReady = true
+		if m.index.CollapsedSections[sectionActive] {
+			t.Fatal("expected section to start expanded")
+		}
+
+		m.index.Cursor = 0
+		result, _ := m.dispatchKey(tea.KeyPressMsg{Code: tea.KeySpace})
+		updated := result.(Model)
+		if !updated.index.CollapsedSections[sectionActive] {
+			t.Error("expected section to be collapsed after Space")
+		}
+		if len(updated.index.Items) != 3 {
+			t.Errorf("expected 3 items (3 sections only), got %d", len(updated.index.Items))
+		}
+	})
+
+	t.Run("Space on spec still expands requirements", func(t *testing.T) {
+		m := Model{
+			mode:  ModeIndex,
+			width: 80,
+			project: &openspec.Project{
+				Changes: []openspec.Change{{Name: "feature-a"}},
+			},
+			projectSpecs: []openspec.ProjectSpec{
+				{Name: "auth", RequirementCount: 2, RequirementNames: []string{"Login", "Logout"}},
+			},
+			index: indexState{
+				ExpandedSpecs: make(map[int]bool),
+			},
+		}
+		m.buildIndexItems()
+		m.vp = viewport.New(viewport.WithWidth(80), viewport.WithHeight(20))
+		m.vpReady = true
+
+		specIdx := -1
+		for i, it := range m.index.Items {
+			if it.kind == indexKindSpec {
+				specIdx = i
+				break
+			}
+		}
+		if specIdx < 0 {
+			t.Fatal("expected a spec item in the list")
+		}
+		m.index.Cursor = specIdx
+
+		result, _ := m.dispatchKey(tea.KeyPressMsg{Code: tea.KeySpace})
+		updated := result.(Model)
+		if !updated.index.ExpandedSpecs[0] {
+			t.Error("expected spec to be expanded after Space on spec item")
+		}
+		reqCount := 0
+		for _, it := range updated.index.Items {
+			if it.kind == indexKindRequirement {
+				reqCount++
+			}
+		}
+		if reqCount != 2 {
+			t.Errorf("expected 2 requirement items, got %d", reqCount)
+		}
+	})
+
+	t.Run("filter respects collapsed section", func(t *testing.T) {
+		m := &Model{
+			width: 80,
+			project: &openspec.Project{
+				Changes: []openspec.Change{{Name: "data-export"}, {Name: "user-auth"}},
+			},
+			index: indexState{
+				ExpandedSpecs:     make(map[int]bool),
+				CollapsedSections: [3]bool{true, false, false},
+			},
+		}
+		m.buildIndexItems()
+		if len(m.index.Items) != 3 {
+			t.Fatalf("expected 3 items (3 sections only), got %d", len(m.index.Items))
+		}
+
+		m.index.FilterText = "data"
+		m.applyFilter()
+		inactiveFound := false
+		for _, fi := range m.index.FilterIndices {
+			if m.index.Items[fi].kind == indexKindActive {
+				inactiveFound = true
+				break
+			}
+		}
+		if inactiveFound {
+			t.Error("expected no active items in filtered results when section is collapsed")
+		}
+	})
+
+	t.Run("cursor navigates through sections and items", func(t *testing.T) {
+		m := Model{
+			mode:  ModeIndex,
+			width: 80,
+			project: &openspec.Project{
+				Changes: []openspec.Change{{Name: "feat-a"}, {Name: "feat-b"}},
+			},
+			index: indexState{
+				ExpandedSpecs: make(map[int]bool),
+			},
+		}
+		m.buildIndexItems()
+		m.vp = viewport.New(viewport.WithWidth(80), viewport.WithHeight(20))
+		m.vpReady = true
+
+		expectedKinds := []indexItemKind{
+			indexKindSection, indexKindActive, indexKindActive,
+			indexKindSection, indexKindSection,
+		}
+		if len(m.index.Items) < len(expectedKinds) {
+			t.Fatalf("expected at least %d items, got %d", len(expectedKinds), len(m.index.Items))
+		}
+		for i, ek := range expectedKinds {
+			if m.index.Items[i].kind != ek {
+				t.Errorf("item[%d]: expected kind %d, got %d", i, ek, m.index.Items[i].kind)
+			}
+		}
+
+		positions := []int{0, 1, 2, 3, 4, 3, 2, 1, 0}
+		expectedKindsAtPos := []indexItemKind{
+			indexKindSection, // 0: Active section
+			indexKindActive,  // 1: feat-a
+			indexKindActive,  // 2: feat-b
+			indexKindSection, // 3: Specs section
+			indexKindSection, // 4: Archived section
+			indexKindSection, // 3: Specs section (back)
+			indexKindActive,  // 2: feat-b (back)
+			indexKindActive,  // 1: feat-a (back)
+			indexKindSection, // 0: Active section (back)
+		}
+
+		for step, expectedPos := range positions {
+			if m.index.Cursor != expectedPos {
+				t.Fatalf("step %d: expected cursor at %d, got %d", step, expectedPos, m.index.Cursor)
+			}
+			item := m.index.Items[m.visibleItemIdx(m.index.Cursor)]
+			if item.kind != expectedKindsAtPos[step] {
+				t.Errorf("step %d: expected kind %d at cursor, got %d", step, expectedKindsAtPos[step], item.kind)
+			}
+			if step < len(positions)-1 {
+				nextPos := positions[step+1]
+				key := "j"
+				if nextPos < expectedPos {
+					key = "k"
+				}
+				result, _ := m.dispatchKey(tea.KeyPressMsg{Text: key})
+				m = result.(Model)
+			}
+		}
+	})
+
+	t.Run("Enter on section header does nothing", func(t *testing.T) {
+		m := Model{
+			mode:  ModeIndex,
+			width: 80,
+			project: &openspec.Project{
+				Changes: []openspec.Change{{Name: "feat-a"}},
+			},
+			index: indexState{
+				ExpandedSpecs: make(map[int]bool),
+			},
+		}
+		m.buildIndexItems()
+		m.vp = viewport.New(viewport.WithWidth(80), viewport.WithHeight(20))
+		m.vpReady = true
+
+		m.index.Cursor = 0
+		result, cmd := m.dispatchKey(tea.KeyPressMsg{Code: tea.KeyEnter})
+		updated := result.(Model)
+		if cmd != nil {
+			t.Error("expected nil cmd (no navigation)")
+		}
+		if updated.mode != ModeIndex {
+			t.Errorf("expected mode to stay ModeIndex, got %d", updated.mode)
+		}
+		if updated.index.Cursor != 0 {
+			t.Errorf("expected cursor to stay at 0, got %d", updated.index.Cursor)
+		}
+	})
+
+	t.Run("collapsed section shows ellipsis in rendered content", func(t *testing.T) {
+		m := &Model{
+			width: 80,
+			project: &openspec.Project{
+				Changes: []openspec.Change{{Name: "feat-a"}},
+			},
+			index: indexState{
+				ExpandedSpecs:     make(map[int]bool),
+				CollapsedSections: [3]bool{true, false, false},
+			},
+		}
+		m.buildIndexItems()
+		content, _ := m.renderIndexContent()
+		if !strings.Contains(content, "…") {
+			t.Errorf("expected ellipsis in collapsed section header, got:\n%s", content)
+		}
+
+		m.index.CollapsedSections[sectionActive] = false
+		m.buildIndexItems()
+		content, _ = m.renderIndexContent()
+		if strings.Contains(content, "▼") {
+			t.Errorf("expected no ▼ indicator in expanded section header, got:\n%s", content)
 		}
 	})
 }
@@ -579,28 +841,28 @@ func TestMatchesFilter(t *testing.T) {
 	m.buildIndexItems()
 
 	t.Run("active change matches name", func(t *testing.T) {
-		item := m.index.Items[0]
+		item := m.index.Items[1]
 		if !m.matchesFilter(item, "data") {
 			t.Error("expected 'data-export' to match 'data'")
 		}
 	})
 
 	t.Run("active change case insensitive", func(t *testing.T) {
-		item := m.index.Items[1]
+		item := m.index.Items[2]
 		if !m.matchesFilter(item, "auth") {
 			t.Error("expected 'auth-module' to match 'auth'")
 		}
 	})
 
 	t.Run("active change no match", func(t *testing.T) {
-		item := m.index.Items[0]
+		item := m.index.Items[1]
 		if m.matchesFilter(item, "xyz") {
 			t.Error("expected 'data-export' not to match 'xyz'")
 		}
 	})
 
 	t.Run("spec matches name", func(t *testing.T) {
-		item := m.index.Items[2]
+		item := m.index.Items[4]
 		if !m.matchesFilter(item, "mouse") {
 			t.Error("expected spec name to match 'mouse'")
 		}
@@ -614,14 +876,14 @@ func TestMatchesFilter(t *testing.T) {
 	})
 
 	t.Run("archived change matches name", func(t *testing.T) {
-		item := m.index.Items[3]
+		item := m.index.Items[6]
 		if !m.matchesFilter(item, "tick") {
 			t.Error("expected archived name to match 'tick'")
 		}
 	})
 
 	t.Run("substring partial match", func(t *testing.T) {
-		item := m.index.Items[0]
+		item := m.index.Items[1]
 		if !m.matchesFilter(item, "port") {
 			t.Error("expected 'data-export' to match substring 'port'")
 		}

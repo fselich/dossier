@@ -189,6 +189,8 @@ func (m *Model) visibleItemCount() int {
 
 func (m *Model) matchesFilter(item indexItem, lowerQuery string) bool {
 	switch item.kind {
+	case indexKindSection:
+		return true
 	case indexKindActive:
 		if item.idx < len(m.project.Changes) {
 			return strings.Contains(strings.ToLower(m.project.Changes[item.idx].Name), lowerQuery)
@@ -256,20 +258,32 @@ func (m *Model) buildSpecOrder() {
 func (m *Model) buildIndexItems() {
 	m.buildSpecOrder()
 	m.index.Items = nil
-	for i := range m.project.Changes {
-		m.index.Items = append(m.index.Items, indexItem{kind: indexKindActive, idx: i})
+
+	m.index.Items = append(m.index.Items, indexItem{kind: indexKindSection, idx: sectionActive})
+	if !m.index.CollapsedSections[sectionActive] {
+		for i := range m.project.Changes {
+			m.index.Items = append(m.index.Items, indexItem{kind: indexKindActive, idx: i})
+		}
 	}
-	for _, i := range m.index.Order {
-		ps := m.projectSpecs[i]
-		m.index.Items = append(m.index.Items, indexItem{kind: indexKindSpec, idx: i})
-		if m.index.ExpandedSpecs[i] {
-			for r := range ps.RequirementNames {
-				m.index.Items = append(m.index.Items, indexItem{kind: indexKindRequirement, idx: i, reqIdx: r})
+
+	m.index.Items = append(m.index.Items, indexItem{kind: indexKindSection, idx: sectionSpecs})
+	if !m.index.CollapsedSections[sectionSpecs] {
+		for _, i := range m.index.Order {
+			ps := m.projectSpecs[i]
+			m.index.Items = append(m.index.Items, indexItem{kind: indexKindSpec, idx: i})
+			if m.index.ExpandedSpecs[i] {
+				for r := range ps.RequirementNames {
+					m.index.Items = append(m.index.Items, indexItem{kind: indexKindRequirement, idx: i, reqIdx: r})
+				}
 			}
 		}
 	}
-	for i := range m.index.ArchiveChanges {
-		m.index.Items = append(m.index.Items, indexItem{kind: indexKindArchived, idx: i})
+
+	m.index.Items = append(m.index.Items, indexItem{kind: indexKindSection, idx: sectionArchived})
+	if !m.index.CollapsedSections[sectionArchived] {
+		for i := range m.index.ArchiveChanges {
+			m.index.Items = append(m.index.Items, indexItem{kind: indexKindArchived, idx: i})
+		}
 	}
 }
 
@@ -296,154 +310,176 @@ func (m *Model) renderIndexContent() (string, int) {
 	line := 0
 	cursorLine := 0
 
-	activeEnd := 0
-	for activeEnd < len(m.index.Items) && m.index.Items[activeEnd].kind == indexKindActive {
-		activeEnd++
-	}
-	specEnd := activeEnd
-	for specEnd < len(m.index.Items) && (m.index.Items[specEnd].kind == indexKindSpec || m.index.Items[specEnd].kind == indexKindRequirement) {
-		specEnd++
-	}
-
-	sb.WriteString("\n")
-	line++
-	activeTitle := "Active Changes"
-	if n := len(m.project.Changes); n > 0 {
-		activeTitle = fmt.Sprintf("Active Changes (%d)", n)
-	}
-	sb.WriteString("  " + sectionStyle.Render(activeTitle) + "\n\n")
-	line += 2
-
-	if len(m.project.Changes) == 0 {
-		sb.WriteString(helpStyle.Render("  No active changes") + "\n")
-		line++
-	} else {
-		anyVisible := false
-		for i := 0; i < activeEnd; i++ {
-			if !m.isItemVisible(i) {
-				continue
-			}
-			anyVisible = true
-			ch := m.project.Changes[m.index.Items[i].idx]
-			cursor := m.isCursorAt(i)
-			if cursor {
-				cursorLine = line
-			}
-			sb.WriteString(m.renderActiveItem(ch, cursor, contentWidth) + "\n")
-			line++
+	// Precompute spec/archive display metrics
+	maxSpecName := 0
+	maxReqCount := 0
+	for _, ps := range m.projectSpecs {
+		if len(ps.Name) > maxSpecName {
+			maxSpecName = len(ps.Name)
 		}
-		if !anyVisible {
-			sb.WriteString(helpStyle.Render("  No items match '"+m.index.FilterText+"'") + "\n")
-			line++
+		if ps.RequirementCount > maxReqCount {
+			maxReqCount = ps.RequirementCount
+		}
+	}
+	maxReqDigits := len(strconv.Itoa(maxReqCount))
+	maxArchName := 0
+	for _, ch := range m.index.ArchiveChanges {
+		if len(ch.Name) > maxArchName {
+			maxArchName = len(ch.Name)
 		}
 	}
 
 	sb.WriteString("\n")
 	line++
 
-	specTitle := "Specifications"
-	if n := len(m.projectSpecs); n > 0 {
-		specTitle = fmt.Sprintf("Specifications (%d)", n)
-	}
-	sb.WriteString("  " + sectionStyle.Render(specTitle) + "\n\n")
-	line += 2
+	for i := 0; i < len(m.index.Items); {
+		item := m.index.Items[i]
 
-	if len(m.projectSpecs) == 0 {
-		sb.WriteString(helpStyle.Render("  No specifications available") + "\n")
-		line++
-	} else {
-		maxName := 0
-		maxReqCount := 0
-		for _, ps := range m.projectSpecs {
-			if len(ps.Name) > maxName {
-				maxName = len(ps.Name)
-			}
-			if ps.RequirementCount > maxReqCount {
-				maxReqCount = ps.RequirementCount
-			}
+		if item.kind != indexKindSection {
+			i++
+			continue
 		}
-		maxReqDigits := len(strconv.Itoa(maxReqCount))
+
+		sectionIdx := item.idx
+		isCollapsed := m.index.CollapsedSections[sectionIdx]
+		totalCount := sectionItemCount(sectionIdx, m)
+
+		sectionName := sectionNames[sectionIdx]
+		header := fmt.Sprintf("%s (%d)", sectionName, totalCount)
+		if isCollapsed {
+			header += " " + helpStyle.Render("…")
+		}
+
+		cursor := m.isCursorAt(i)
+		if cursor {
+			cursorLine = line
+		}
+		cursorMark := "  "
+		if cursor {
+			cursorMark = progressDoneStyle.Render("▶") + " "
+		}
+		sb.WriteString(cursorMark + sectionStyle.Render(header) + "\n")
+		line++
+
+		sb.WriteString("\n")
+		line++
+
+		i++
+
+		if isCollapsed {
+			for ; i < len(m.index.Items); i++ {
+				if m.index.Items[i].kind == indexKindSection {
+					break
+				}
+			}
+			if sectionIdx != sectionArchived {
+				sb.WriteString("\n")
+				line++
+			}
+			continue
+		}
+
+		if totalCount == 0 {
+			sb.WriteString(helpStyle.Render("  "+sectionEmptyMsg(sectionIdx)) + "\n")
+			line++
+			i = m.skipToNextSection(i)
+			if sectionIdx != sectionArchived {
+				sb.WriteString("\n")
+				line++
+			}
+			continue
+		}
+
 		anyVisible := false
-		for i := activeEnd; i < specEnd; i++ {
+		for ; i < len(m.index.Items); i++ {
+			if m.index.Items[i].kind == indexKindSection {
+				break
+			}
 			if !m.isItemVisible(i) {
 				continue
 			}
 			anyVisible = true
-			item := m.index.Items[i]
-			cursor := m.isCursorAt(i)
-			if cursor {
+			childItem := m.index.Items[i]
+			childCursor := m.isCursorAt(i)
+			if childCursor {
 				cursorLine = line
 			}
 
-			if item.kind == indexKindSpec {
-				ps := m.projectSpecs[item.idx]
-				pad := strings.Repeat(" ", maxName-len(ps.Name))
+			switch childItem.kind {
+			case indexKindActive:
+				ch := m.project.Changes[childItem.idx]
+				sb.WriteString(m.renderActiveItem(ch, childCursor, contentWidth) + "\n")
+			case indexKindSpec:
+				ps := m.projectSpecs[childItem.idx]
+				pad := strings.Repeat(" ", maxSpecName-len(ps.Name))
 				label := helpStyle.Render(fmt.Sprintf("%*d requirements", maxReqDigits, ps.RequirementCount))
 				cursorMark := "  "
 				name := ps.Name
-				if cursor {
+				if childCursor {
 					cursorMark = progressDoneStyle.Render("▶") + " "
 					name = indexActiveStyle.Render(ps.Name)
 				}
 				sb.WriteString(cursorMark + name + pad + "  " + label + "\n")
-				line++
-			} else {
+			case indexKindRequirement:
 				reqMark := "    "
-				rName := taskPendingStyle.Render(m.projectSpecs[item.idx].RequirementNames[item.reqIdx])
-				if cursor {
+				rName := taskPendingStyle.Render(m.projectSpecs[childItem.idx].RequirementNames[childItem.reqIdx])
+				if childCursor {
 					reqMark = "  " + progressDoneStyle.Render("▶") + " "
-					rName = indexActiveStyle.Render(m.projectSpecs[item.idx].RequirementNames[item.reqIdx])
+					rName = indexActiveStyle.Render(m.projectSpecs[childItem.idx].RequirementNames[childItem.reqIdx])
 				}
 				sb.WriteString(reqMark + rName + "\n")
-				line++
+			case indexKindArchived:
+				ch := m.index.ArchiveChanges[childItem.idx]
+				sb.WriteString(m.renderArchivedItem(ch, childCursor, maxArchName) + "\n")
 			}
+			line++
 		}
+
 		if !anyVisible {
 			sb.WriteString(helpStyle.Render("  No items match '"+m.index.FilterText+"'") + "\n")
 			line++
 		}
-	}
 
-	sb.WriteString("\n")
-	line++
-
-	archivedTitle := "Archived Changes"
-	if n := len(m.index.ArchiveChanges); n > 0 {
-		archivedTitle = fmt.Sprintf("Archived Changes (%d)", n)
-	}
-	sb.WriteString("  " + sectionStyle.Render(archivedTitle) + "\n\n")
-	line += 2
-
-	if len(m.index.ArchiveChanges) == 0 {
-		sb.WriteString(helpStyle.Render("  No archived changes") + "\n")
-	} else {
-		maxName := 0
-		for _, ch := range m.index.ArchiveChanges {
-			if len(ch.Name) > maxName {
-				maxName = len(ch.Name)
-			}
-		}
-		anyVisible := false
-		for i := specEnd; i < len(m.index.Items); i++ {
-			if !m.isItemVisible(i) {
-				continue
-			}
-			anyVisible = true
-			ch := m.index.ArchiveChanges[m.index.Items[i].idx]
-			cursor := m.isCursorAt(i)
-			if cursor {
-				cursorLine = line
-			}
-			sb.WriteString(m.renderArchivedItem(ch, cursor, maxName) + "\n")
-			line++
-		}
-		if !anyVisible {
-			sb.WriteString(helpStyle.Render("  No items match '"+m.index.FilterText+"'") + "\n")
+		if sectionIdx != sectionArchived {
+			sb.WriteString("\n")
 			line++
 		}
 	}
 
 	return sb.String(), cursorLine
+}
+
+func sectionItemCount(sectionIdx int, m *Model) int {
+	switch sectionIdx {
+	case sectionActive:
+		return len(m.project.Changes)
+	case sectionSpecs:
+		return len(m.projectSpecs)
+	case sectionArchived:
+		return len(m.index.ArchiveChanges)
+	}
+	return 0
+}
+
+func sectionEmptyMsg(sectionIdx int) string {
+	switch sectionIdx {
+	case sectionActive:
+		return "No active changes"
+	case sectionSpecs:
+		return "No specifications available"
+	case sectionArchived:
+		return "No archived changes"
+	}
+	return ""
+}
+
+func (m *Model) skipToNextSection(start int) int {
+	for i := start; i < len(m.index.Items); i++ {
+		if m.index.Items[i].kind == indexKindSection {
+			return i
+		}
+	}
+	return len(m.index.Items)
 }
 
 func (m *Model) renderActiveItem(ch openspec.Change, cursor bool, contentWidth int) string {
@@ -511,68 +547,67 @@ const indexViewportContentStart = 3
 func (m *Model) indexItemAtContentLine(contentLine int) (int, bool) {
 	line := 0
 
-	line += 3
+	line++ // leading blank
 
-	activeEnd := 0
-	for activeEnd < len(m.index.Items) && m.index.Items[activeEnd].kind == indexKindActive {
-		activeEnd++
-	}
-
-	if activeEnd > 0 {
-		for itemIdx := range activeEnd {
-			if !m.isItemVisible(itemIdx) {
-				continue
-			}
-			if line == contentLine {
-				return itemIdx, true
-			}
-			line++
-		}
-	}
-	if activeEnd == 0 {
-		line++
-	}
-
-	line++
-
-	line += 2
-
-	specEnd := activeEnd
-	for specEnd < len(m.index.Items) && (m.index.Items[specEnd].kind == indexKindSpec || m.index.Items[specEnd].kind == indexKindRequirement) {
-		specEnd++
-	}
-
-	if specEnd > activeEnd {
-		for itemIdx := activeEnd; itemIdx < specEnd; itemIdx++ {
-			if !m.isItemVisible(itemIdx) {
-				continue
-			}
-			if line == contentLine {
-				return itemIdx, true
-			}
-			line++
-		}
-	}
-	if specEnd == activeEnd {
-		line++
-	}
-
-	line++
-
-	line += 2
-
-	if specEnd >= len(m.index.Items) {
-		line++
-	}
-
-	for itemIdx := specEnd; itemIdx < len(m.index.Items); itemIdx++ {
-		if !m.isItemVisible(itemIdx) {
+	for i := 0; i < len(m.index.Items); {
+		item := m.index.Items[i]
+		if item.kind != indexKindSection {
+			i++
 			continue
 		}
+
+		sectionIdx := item.idx
+		isCollapsed := m.index.CollapsedSections[sectionIdx]
+		totalCount := sectionItemCount(sectionIdx, m)
+
 		if line == contentLine {
-			return itemIdx, true
+			return i, true
 		}
-		line++
+		line++ // section header
+
+		line++ // blank after header
+
+		i++
+
+		if isCollapsed {
+			i = m.skipToNextSection(i)
+			if sectionIdx != sectionArchived {
+				line++ // blank between sections
+			}
+			continue
+		}
+
+		if totalCount == 0 {
+			line++ // "No X" message (no item)
+			i = m.skipToNextSection(i)
+			if sectionIdx != sectionArchived {
+				line++ // blank between sections
+			}
+			continue
+		}
+
+		anyVisible := false
+		for ; i < len(m.index.Items); i++ {
+			if m.index.Items[i].kind == indexKindSection {
+				break
+			}
+			if !m.isItemVisible(i) {
+				continue
+			}
+			anyVisible = true
+			if line == contentLine {
+				return i, true
+			}
+			line++
+		}
+
+		if !anyVisible {
+			line++ // "No items match" message (no item)
+		}
+
+		if sectionIdx != sectionArchived {
+			line++ // blank between sections
+		}
 	}
 
 	return 0, false
@@ -717,6 +752,9 @@ func (m Model) updateIndex(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 				m.mode = ModeViewingSpec
 				return m.commitStateChange()
 			}
+			if item.kind == indexKindSection {
+				return m, nil
+			}
 			m.index.ArchiveCursor = item.idx
 			m.tab = firstAvailableTab(m.index.ArchiveChanges[item.idx])
 			m.mode = ModeViewingArchive
@@ -726,7 +764,32 @@ func (m Model) updateIndex(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "space":
 		if m.visibleItemCount() > 0 {
 			item := m.index.Items[m.visibleItemIdx(m.index.Cursor)]
-			if item.kind == indexKindSpec {
+			if item.kind == indexKindSection {
+				sectionIdx := item.idx
+				m.index.CollapsedSections[sectionIdx] = !m.index.CollapsedSections[sectionIdx]
+				m.buildIndexItems()
+				m.applyFilter()
+				m.index.Cursor = 0
+				if m.index.FilterIndices != nil {
+					for i, idx := range m.index.FilterIndices {
+						if m.index.Items[idx].kind == indexKindSection && m.index.Items[idx].idx == sectionIdx {
+							m.index.Cursor = i
+							break
+						}
+					}
+				} else {
+					for i, it := range m.index.Items {
+						if it.kind == indexKindSection && it.idx == sectionIdx {
+							m.index.Cursor = i
+							break
+						}
+					}
+				}
+				if m.index.Cursor >= m.visibleItemCount() {
+					m.index.Cursor = max(0, m.visibleItemCount()-1)
+				}
+				m.refreshIndexViewport()
+			} else if item.kind == indexKindSpec {
 				specIdx := item.idx
 				m.index.ExpandedSpecs[specIdx] = !m.index.ExpandedSpecs[specIdx]
 				m.buildIndexItems()

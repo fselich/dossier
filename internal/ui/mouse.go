@@ -158,6 +158,9 @@ func (m Model) clickIndexItem(idx int) (tea.Model, tea.Cmd) {
 		m.mode = ModeViewingSpec
 		m.vp.SetHeight(m.contentHeight())
 		return m, m.loadViewport()
+
+	case indexKindSection:
+		return m, nil
 	}
 	return m, nil
 }

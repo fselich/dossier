@@ -2,6 +2,14 @@
 
 # Changelog
 
+## v0.15.0
+
+### Added
+- Index sections are now collapsible. Press `Space` on any section header to fold its contents; press again to expand; press again to fold; and again to expand... You'll figure it out eventually.
+
+### Fixed
+- Render cache is now invalidated after returning from the external editor (`e`). Previously, you'd edit a file and the artifact view was full of stale junk. If you hadn't noticed, your artifacts were junk before editing them anyway.
+
 ## v0.14.1
 
 ### Fixed
