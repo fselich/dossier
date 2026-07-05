@@ -8,7 +8,7 @@ Provides a `changes` tab in the TUI that shows working-tree file changes from `g
 
 ### Requirement: Git status tab visible in change viewer
 
-The TUI SHALL show a fifth tab labeled `changes` in the tab bar when running inside a git worktree. The tab SHALL NOT appear when the project is not inside a git repo. The tab label SHALL include a count of changed files (e.g. `changes (5)`) when there are changes, and SHALL show `changes` (without a count) when the working tree is clean.
+The TUI SHALL show a fifth tab labeled `changes` in the tab bar when running inside a git worktree AND there are changed files (`len(gitState.Files) > 0`). The tab SHALL NOT appear when the project is not inside a git repo. The tab SHALL be shown as disabled (grayed out) when the working tree is clean. The tab label SHALL include a count of changed files (e.g. `changes (5)`) when there are changes, and SHALL show `changes` (without a count) when the working tree is clean.
 
 #### Scenario: Tab visible inside git repo
 - **GIVEN** the project is inside a git worktree
@@ -19,6 +19,16 @@ The TUI SHALL show a fifth tab labeled `changes` in the tab bar when running ins
 - **GIVEN** the project is NOT inside a git worktree
 - **WHEN** the TUI starts
 - **THEN** the tab bar does NOT include the `changes` tab
+
+#### Scenario: Tab disabled when working tree is clean
+- **GIVEN** the project is inside a git worktree with no changed files
+- **WHEN** the TUI is in normal mode
+- **THEN** the `changes` tab is shown as disabled (grayed out) and is not selectable
+
+#### Scenario: Tab becomes enabled when files appear
+- **GIVEN** the changes tab is disabled with a clean working tree
+- **WHEN** a file is modified on disk (detected by polling)
+- **THEN** within a maximum of 500 ms the tab becomes enabled and shows the file count
 
 #### Scenario: Working tree clean shows no count
 - **GIVEN** the project is inside a git worktree and the working tree is clean
@@ -98,12 +108,22 @@ The TUI SHALL poll `git status --porcelain` on the same 500ms tick used for arti
 
 ### Requirement: Diff view toggle within git changes tab
 
-The TUI SHALL allow the user to view the diff of a file in the git changes tab by pressing `d`. For tracked files, the TUI SHALL parse the raw `git diff` output into structured lines with line numbers (`OldNum`/`NewNum`), render them with chroma syntax highlighting, display line numbers (4-char columns), and support horizontal scrolling via `h`/`l` keys (10 runes per step) by truncating raw content before chroma tokenization to avoid ANSI corruption. For untracked files (`??`), the TUI SHALL read the file contents and render them with chroma syntax highlighting. Pressing `d` or `Esc` in the diff view SHALL reset scroll to zero and return to the file list. The diff content SHALL be invalidated when git status changes.
+The TUI SHALL allow the user to view the diff of a file in the git changes tab by pressing `d`, `Enter`, or `e`. For tracked files, the TUI SHALL parse the raw `git diff` output into structured lines with line numbers (`OldNum`/`NewNum`), render them with chroma syntax highlighting, display line numbers (4-char columns), and support horizontal scrolling via `h`/`l` keys (10 runes per step) by truncating raw content before chroma tokenization to avoid ANSI corruption. For untracked files (`??`), the TUI SHALL read the file contents and render them with chroma syntax highlighting. Pressing `d` or `Esc` in the diff view SHALL reset scroll to zero and return to the file list. The TUI SHALL NOT open the system editor from the git changes tab. The diff content SHALL be invalidated when git status changes.
 
 #### Scenario: Press d on modified tracked file shows syntax-highlighted diff
 - **GIVEN** the git changes tab is open and the cursor is on a modified tracked file
 - **WHEN** the user presses `d`
 - **THEN** the viewport shows the diff with chroma syntax highlighting, line numbers, and background tints for additions (green) and removals (red)
+
+#### Scenario: Enter on file shows diff
+- **GIVEN** the git changes tab is open and the cursor is on a file
+- **WHEN** the user presses `Enter`
+- **THEN** the diff view is shown for that file (same as pressing `d`)
+
+#### Scenario: e on file shows diff
+- **GIVEN** the git changes tab is open and the cursor is on a file
+- **WHEN** the user presses `e`
+- **THEN** the diff view is shown for that file (same as pressing `d`)
 
 #### Scenario: Press d on untracked file shows syntax-highlighted content
 - **GIVEN** the git changes tab is open and the cursor is on an untracked file (`??`)
@@ -135,7 +155,7 @@ The TUI SHALL allow the user to view the diff of a file in the git changes tab b
 - **WHEN** the user presses `j` or `k`
 - **THEN** the diff content scrolls vertically via the viewport
 
-#### Scenario: d does nothing on clean working tree
+#### Scenario: d/Enter/e does nothing on clean working tree
 - **GIVEN** the working tree is clean (showing "working tree clean" message)
-- **WHEN** the user presses `d`
+- **WHEN** the user presses `d`, `Enter`, or `e`
 - **THEN** nothing happens

@@ -17,7 +17,7 @@
 - [x] 4.5 `make build` succeeds
 - [x] 4.6 `make lint` passes
 - [x] 4.7 `make test` passes
-- [ ] 4.1 `Enter` on a file shows diff view
-- [ ] 4.2 `e` on a file shows diff view
-- [ ] 4.3 Tab is disabled when working tree is clean
-- [ ] 4.4 Tab becomes enabled when files appear
+- [x] 4.1 `Enter` on a file shows diff view
+- [x] 4.2 `e` on a file shows diff view
+- [x] 4.3 Tab is disabled when working tree is clean
+- [x] 4.4 Tab becomes enabled when files appear
