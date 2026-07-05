@@ -22,6 +22,8 @@ func (m *Model) loadViewport() tea.Cmd {
 		return m.loadViewportForSpec()
 	case m.tab == TabTasks && m.mode == ModeNormal:
 		return m.loadViewportForTasks()
+	case m.tab == TabGit && m.mode == ModeNormal:
+		return m.loadViewportForGit()
 	default:
 		return m.loadViewportForArtifact()
 	}
@@ -118,6 +120,11 @@ func (m *Model) loadViewportForSpec() tea.Cmd {
 
 func (m *Model) loadViewportForTasks() tea.Cmd {
 	m.refreshTasksViewport()
+	return nil
+}
+
+func (m *Model) loadViewportForGit() tea.Cmd {
+	m.refreshGitViewport()
 	return nil
 }
 

@@ -9,6 +9,7 @@ import (
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/glamour/v2"
+	"github.com/fselich/dossier/internal/git"
 	"github.com/fselich/dossier/internal/openspec"
 )
 
@@ -29,10 +30,11 @@ const (
 	TabDesign
 	TabSpecs
 	TabTasks
+	TabGit
 	tabCount
 )
 
-var tabLabels = [tabCount]string{"proposal", "design", "specs", "tasks"}
+var tabLabels = [tabCount]string{"proposal", "design", "specs", "tasks", "changes"}
 
 type errClearMsg struct{}
 type editorReturnMsg struct{}
@@ -82,6 +84,15 @@ type specViewerState struct {
 type taskState struct {
 	Items  []openspec.TaskItem
 	Cursor int
+}
+
+type gitState struct {
+	Files       []git.FileStatus
+	Cursor      int
+	ShowingDiff bool
+	DiffLines   []DiffLine
+	DiffFile    string
+	ScrollX     int
 }
 
 type indexItemKind int
@@ -135,6 +146,10 @@ type Model struct {
 	loading    bool
 	singlePath bool
 
+	isGitRepo bool
+	gitRoot   string
+	gitState  gitState
+
 	width, height int
 
 	renderCache     map[Tab]string
@@ -158,7 +173,12 @@ func New(project *openspec.Project, cfg openspec.ProjectConfig, root string, loa
 		renderCache:   make(map[Tab]string),
 		projectConfig: cfg,
 		theme:         Theme{},
+		isGitRepo:     git.IsInsideWorkTree(root),
 	}
+	if m.isGitRepo {
+		m.gitRoot = git.WorkTreeRoot(root)
+	}
+	m.pollGitStatus()
 	if len(project.Changes) > 0 {
 		m.tab = m.defaultTab()
 		m.loadTaskItems()
@@ -258,6 +278,8 @@ func (m *Model) tabAvailable(t Tab) bool {
 		return ch.Tasks.Present
 	case TabSpecs:
 		return ch.Specs.Present
+	case TabGit:
+		return m.isGitRepo && m.mode == ModeNormal && len(m.gitState.Files) > 0
 	}
 	return false
 }

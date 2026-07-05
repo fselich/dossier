@@ -19,11 +19,21 @@ func (m Model) updateViewer(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m.commitStateChange()
 
 	case "a", "esc":
+		if m.tab == TabGit && m.gitState.ShowingDiff {
+			m.toggleGitDiff()
+			return m, nil
+		}
 		m.enterIndex()
 		return m, nil
 
 	case "h":
-		if len(m.project.Changes) > 0 {
+		if m.tab == TabGit && m.gitState.ShowingDiff {
+			m.gitState.ScrollX -= 10
+			if m.gitState.ScrollX < 0 {
+				m.gitState.ScrollX = 0
+			}
+			m.refreshGitViewport()
+		} else if len(m.project.Changes) > 0 {
 			m.changeIdx = (m.changeIdx - 1 + len(m.project.Changes)) % len(m.project.Changes)
 			m.renderCache = make(map[Tab]string)
 			m.loadTaskItems()
@@ -33,13 +43,31 @@ func (m Model) updateViewer(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 
 	case "l":
-		if len(m.project.Changes) > 0 {
+		if m.tab == TabGit && m.gitState.ShowingDiff {
+			m.gitState.ScrollX += 10
+			m.refreshGitViewport()
+		} else if len(m.project.Changes) > 0 {
 			m.changeIdx = (m.changeIdx + 1) % len(m.project.Changes)
 			m.renderCache = make(map[Tab]string)
 			m.loadTaskItems()
 			m.tab = m.defaultTab()
 			m.specIdx = 0
 			return m.commitStateChange()
+		}
+
+	case "right":
+		if m.tab == TabGit && m.gitState.ShowingDiff {
+			m.gitState.ScrollX += 10
+			m.refreshGitViewport()
+		}
+
+	case "left":
+		if m.tab == TabGit && m.gitState.ShowingDiff {
+			m.gitState.ScrollX -= 10
+			if m.gitState.ScrollX < 0 {
+				m.gitState.ScrollX = 0
+			}
+			m.refreshGitViewport()
 		}
 
 	case "1":
@@ -71,6 +99,11 @@ func (m Model) updateViewer(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.tab = TabTasks
 			return m.commitStateChange()
 		}
+	case "5":
+		if m.tabAvailable(TabGit) {
+			m.tab = TabGit
+			return m.commitStateChange()
+		}
 
 	case "tab":
 		nxt := m.nextAvailableTab(m.tab, 1)
@@ -85,19 +118,40 @@ func (m Model) updateViewer(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			return m.commitStateChange()
 		}
 
+	case "d":
+		if m.tab == TabGit {
+			m.toggleGitDiff()
+		}
+
 	case "j", "down":
-		if m.tab == TabTasks {
+		switch m.tab {
+		case TabTasks:
 			m.moveCursorDown()
 			m.refreshTasksViewport()
-		} else {
+		case TabGit:
+			if m.gitState.ShowingDiff {
+				m.vp.ScrollDown(1)
+			} else {
+				m.moveGitCursorDown()
+				m.refreshGitViewport()
+			}
+		default:
 			m.vp.ScrollDown(1)
 		}
 
 	case "k", "up":
-		if m.tab == TabTasks {
+		switch m.tab {
+		case TabTasks:
 			m.moveCursorUp()
 			m.refreshTasksViewport()
-		} else {
+		case TabGit:
+			if m.gitState.ShowingDiff {
+				m.vp.ScrollUp(1)
+			} else {
+				m.moveGitCursorUp()
+				m.refreshGitViewport()
+			}
+		default:
 			m.vp.ScrollUp(1)
 		}
 
@@ -106,7 +160,17 @@ func (m Model) updateViewer(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			return m, m.doToggle()
 		}
 
+	case "enter":
+		if m.tab == TabGit {
+			m.toggleGitDiff()
+			return m, nil
+		}
+
 	case "e":
+		if m.tab == TabGit {
+			m.toggleGitDiff()
+			return m, nil
+		}
 		if m.tabAvailable(m.tab) {
 			path := m.artifactPath()
 			if path != "" {

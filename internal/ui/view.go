@@ -91,6 +91,9 @@ func (m *Model) renderTabBar() string {
 	parts := make([]string, 0, tabCount)
 	for t := Tab(0); t < tabCount; t++ {
 		label := tabLabels[t]
+		if t == TabGit && len(m.gitState.Files) > 0 {
+			label = "changes (" + fmt.Sprintf("%d", len(m.gitState.Files)) + ")"
+		}
 		switch {
 		case t == m.tab:
 			parts = append(parts, tabActiveStyle.Render(label))
@@ -209,8 +212,18 @@ func (m *Model) renderHelpBar() string {
 	if m.mode == ModeViewingArchive {
 		return helpStyle.Render("1-4/Tab: artifact  j/k: scroll  a/Esc: index  q: quit")
 	}
-	if m.tab == TabTasks {
-		return helpStyle.Render("h/l: change  1-4/Tab: artifact  j/k: navigate  Space: toggle  e: edit  i: info  Esc: index  q: quit")
+	tabRange := "1-4"
+	if m.isGitRepo {
+		tabRange = "1-5"
 	}
-	return helpStyle.Render("h/l: change  1-4/Tab: artifact  j/k: scroll  e: edit  i: info  Esc: index  q: quit")
+	if m.tab == TabGit {
+		if m.gitState.ShowingDiff {
+			return helpStyle.Render("d/Esc: back  j/k: vertical  h/l: ←→ horizontal  q: quit")
+		}
+		return helpStyle.Render("h/l: change  " + tabRange + "/Tab: artifact  j/k: navigate  Enter/e: open file  d: view diff  Esc: index  q: quit")
+	}
+	if m.tab == TabTasks {
+		return helpStyle.Render("h/l: change  " + tabRange + "/Tab: artifact  j/k: navigate  Space: toggle  e: edit  i: info  Esc: index  q: quit")
+	}
+	return helpStyle.Render("h/l: change  " + tabRange + "/Tab: artifact  j/k: scroll  e: edit  i: info  Esc: index  q: quit")
 }

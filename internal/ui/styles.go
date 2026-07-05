@@ -58,4 +58,25 @@ var (
 
 	separatorStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("8"))
+
+	gitStatusModified = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("3"))
+
+	gitStatusAdded = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("2"))
+
+	gitStatusDeleted = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("8"))
+
+	gitStatusRenamed = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("6"))
+
+	gitStatusUntracked = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("5"))
+
+	gitStatusDot = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("8"))
+
+	diffRemoved = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("9"))
 )

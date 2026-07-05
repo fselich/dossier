@@ -12,6 +12,7 @@ import (
 )
 
 func (m *Model) handleTick() tea.Cmd {
+	m.pollGitStatus()
 	if m.mode == ModeViewingArchive || m.mode == ModeViewingSpec {
 		return nil
 	}
