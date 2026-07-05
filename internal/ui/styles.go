@@ -76,4 +76,7 @@ var (
 
 	gitStatusDot = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("8"))
+
+	diffRemoved = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("9"))
 )

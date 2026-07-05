@@ -87,8 +87,12 @@ type taskState struct {
 }
 
 type gitState struct {
-	Files  []git.FileStatus
-	Cursor int
+	Files       []git.FileStatus
+	Cursor      int
+	ShowingDiff bool
+	DiffLines   []DiffLine
+	DiffFile    string
+	ScrollX     int
 }
 
 type indexItemKind int
@@ -275,7 +279,7 @@ func (m *Model) tabAvailable(t Tab) bool {
 	case TabSpecs:
 		return ch.Specs.Present
 	case TabGit:
-		return m.isGitRepo && m.mode == ModeNormal
+		return m.isGitRepo && m.mode == ModeNormal && len(m.gitState.Files) > 0
 	}
 	return false
 }

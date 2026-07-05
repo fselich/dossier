@@ -1,12 +1,8 @@
 package ui
 
 import (
-	"os"
-	"os/exec"
-	"path/filepath"
 	"strings"
 
-	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/fselich/dossier/internal/git"
 )
@@ -23,6 +19,10 @@ func (m *Model) pollGitStatus() {
 		return
 	}
 	m.gitState.Files = files
+	m.gitState.ShowingDiff = false
+	m.gitState.DiffLines = nil
+	m.gitState.DiffFile = ""
+	m.gitState.ScrollX = 0
 	if m.gitState.Cursor >= len(files) {
 		m.gitState.Cursor = 0
 	} else if m.gitState.Cursor > 0 {
@@ -130,6 +130,10 @@ func gitFileColorStyle(x, y byte, isDeleted bool) lipgloss.Style {
 }
 
 func (m *Model) renderGitContent() (string, int) {
+	if m.gitState.ShowingDiff {
+		return m.renderDiffContent()
+	}
+
 	var sb strings.Builder
 	line := 0
 	cursorLine := 0
@@ -182,24 +186,17 @@ func (m *Model) renderGitContent() (string, int) {
 	return sb.String(), cursorLine
 }
 
-func (m *Model) openGitFile() tea.Cmd {
-	if m.gitState.Cursor >= len(m.gitState.Files) {
-		return nil
+func (m *Model) renderDiffContent() (string, int) {
+	var sb strings.Builder
+	header := m.gitState.DiffFile
+	sb.WriteString("\n")
+	sb.WriteString("  " + sectionStyle.Render("diff: "+header) + "\n")
+	sb.WriteString("\n")
+	if m.gitState.DiffLines == nil {
+		sb.WriteString("  (no diff available)\n")
+	} else {
+		content := renderDiff(m.gitState.DiffLines, header, m.width-2, m.gitState.ScrollX)
+		sb.WriteString(content)
 	}
-	f := m.gitState.Files[m.gitState.Cursor]
-	if f.IsDeleted {
-		return nil
-	}
-	path := f.Path
-	if !filepath.IsAbs(path) {
-		path = filepath.Join(m.gitRoot, path)
-	}
-	editor := os.Getenv("EDITOR")
-	if editor == "" {
-		editor = "vi"
-	}
-	cmd := exec.Command(editor, path)
-	return tea.ExecProcess(cmd, func(err error) tea.Msg {
-		return editorReturnMsg{}
-	})
+	return sb.String(), 0
 }
