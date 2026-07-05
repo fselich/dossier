@@ -71,6 +71,11 @@ func (m Model) updateViewer(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.tab = TabTasks
 			return m.commitStateChange()
 		}
+	case "5":
+		if m.tabAvailable(TabGit) {
+			m.tab = TabGit
+			return m.commitStateChange()
+		}
 
 	case "tab":
 		nxt := m.nextAvailableTab(m.tab, 1)
@@ -86,18 +91,26 @@ func (m Model) updateViewer(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 
 	case "j", "down":
-		if m.tab == TabTasks {
+		switch m.tab {
+		case TabTasks:
 			m.moveCursorDown()
 			m.refreshTasksViewport()
-		} else {
+		case TabGit:
+			m.moveGitCursorDown()
+			m.refreshGitViewport()
+		default:
 			m.vp.ScrollDown(1)
 		}
 
 	case "k", "up":
-		if m.tab == TabTasks {
+		switch m.tab {
+		case TabTasks:
 			m.moveCursorUp()
 			m.refreshTasksViewport()
-		} else {
+		case TabGit:
+			m.moveGitCursorUp()
+			m.refreshGitViewport()
+		default:
 			m.vp.ScrollUp(1)
 		}
 
@@ -106,7 +119,15 @@ func (m Model) updateViewer(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			return m, m.doToggle()
 		}
 
+	case "enter":
+		if m.tab == TabGit {
+			return m, m.openGitFile()
+		}
+
 	case "e":
+		if m.tab == TabGit {
+			return m, m.openGitFile()
+		}
 		if m.tabAvailable(m.tab) {
 			path := m.artifactPath()
 			if path != "" {

@@ -1,6 +1,10 @@
 package ui
 
-import tea "charm.land/bubbletea/v2"
+import (
+	"fmt"
+
+	tea "charm.land/bubbletea/v2"
+)
 
 func (m Model) handleMouseWheel(msg tea.MouseWheelMsg) (tea.Model, tea.Cmd) {
 	switch msg.Button {
@@ -17,6 +21,11 @@ func (m Model) handleMouseWheel(msg tea.MouseWheelMsg) (tea.Model, tea.Cmd) {
 			m.refreshTasksViewport()
 			return m, nil
 		}
+		if m.tab == TabGit && m.mode == ModeNormal {
+			m.moveGitCursorUp()
+			m.refreshGitViewport()
+			return m, nil
+		}
 		m.vp.ScrollUp(3)
 		return m, nil
 	case tea.MouseWheelDown:
@@ -30,6 +39,11 @@ func (m Model) handleMouseWheel(msg tea.MouseWheelMsg) (tea.Model, tea.Cmd) {
 		if m.tab == TabTasks && m.mode == ModeNormal {
 			m.moveCursorDown()
 			m.refreshTasksViewport()
+			return m, nil
+		}
+		if m.tab == TabGit && m.mode == ModeNormal {
+			m.moveGitCursorDown()
+			m.refreshGitViewport()
 			return m, nil
 		}
 		m.vp.ScrollDown(3)
@@ -89,7 +103,11 @@ func (m Model) handleMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) {
 
 	x := 1
 	for t := Tab(0); t < tabCount; t++ {
-		w := len(tabLabels[t]) + 2
+		label := tabLabels[t]
+		if t == TabGit && len(m.gitState.Files) > 0 {
+			label = "changes (" + fmt.Sprintf("%d", len(m.gitState.Files)) + ")"
+		}
+		w := len(label) + 2
 		if msg.X >= x && msg.X <= x+w-1 {
 			if !m.tabAvailable(t) {
 				return m, nil

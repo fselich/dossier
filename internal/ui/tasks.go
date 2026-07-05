@@ -76,10 +76,9 @@ var (
 	rxCode = regexp.MustCompile("`(.+?)`")
 	rxBold = regexp.MustCompile(`\*\*(.+?)\*\*`)
 
-	underlineStyle = lipgloss.NewStyle().Underline(true)
-	doneCodeStyle  = lipgloss.NewStyle().Underline(true).Foreground(lipgloss.Color("8"))
-	boldStyle      = lipgloss.NewStyle().Bold(true)
-	cyanStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("6"))
+	doneCodeStyle = lipgloss.NewStyle().Underline(true).Foreground(lipgloss.Color("8"))
+	boldStyle     = lipgloss.NewStyle().Bold(true)
+	cyanStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("6"))
 )
 
 func extractOpeningEscape(style lipgloss.Style) string {
