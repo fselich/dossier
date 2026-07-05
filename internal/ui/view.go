@@ -90,9 +90,12 @@ func (m *Model) renderHeader() string {
 func (m *Model) renderTabBar() string {
 	parts := make([]string, 0, tabCount)
 	for t := Tab(0); t < tabCount; t++ {
+		if t == TabGit && m.mode != ModeNormal {
+			continue
+		}
 		label := tabLabels[t]
 		if t == TabGit && len(m.gitState.Files) > 0 {
-			label = "changes (" + fmt.Sprintf("%d", len(m.gitState.Files)) + ")"
+			label = "code (" + fmt.Sprintf("%d", len(m.gitState.Files)) + ")"
 		}
 		switch {
 		case t == m.tab:

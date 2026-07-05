@@ -2,6 +2,12 @@
 
 # Changelog
 
+## v0.16.1
+
+### Changed
+- Git tab renamed from `changes` to `code`. The old name was ambiguous with OpenSpec changes.
+- Git tab hidden in archive mode — it was irrelevant there and just added noise.
+
 ## v0.16.0
 
 ### Added

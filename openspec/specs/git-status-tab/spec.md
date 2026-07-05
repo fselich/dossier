@@ -2,32 +2,38 @@
 
 ## Purpose
 
-Provides a `changes` tab in the TUI that shows working-tree file changes from `git status --porcelain`, enabling the user to browse modified/added/untracked/renamed/deleted files and open them in the system editor without leaving the TUI.
+Provides a `code` tab in the TUI that shows working-tree file changes from `git status --porcelain`, enabling the user to browse modified/added/untracked/renamed/deleted files and view diffs with syntax highlighting without leaving the TUI.
 
 ## Requirements
 
 ### Requirement: Git status tab visible in change viewer
 
-The TUI SHALL show a fifth tab labeled `changes` in the tab bar when running inside a git worktree AND there are changed files (`len(gitState.Files) > 0`). The tab SHALL NOT appear when the project is not inside a git repo. The tab SHALL be shown as disabled (grayed out) when the working tree is clean. The tab label SHALL include a count of changed files (e.g. `changes (5)`) when there are changes, and SHALL show `changes` (without a count) when the working tree is clean.
+The TUI SHALL show a tab labeled `code` in the tab bar when running inside a git worktree AND there are changed files (`len(gitState.Files) > 0`). The tab SHALL NOT appear when the project is not inside a git repo. The tab SHALL NOT appear in archive mode (`ModeViewingArchive`). The tab SHALL be shown as disabled (grayed out) when the working tree is clean. The tab label SHALL include a count of changed files (e.g. `code (5)`) when there are changes, and SHALL show `code` (without a count) when the working tree is clean.
 
 #### Scenario: Tab visible inside git repo
 - **GIVEN** the project is inside a git worktree
 - **WHEN** the TUI starts with at least one active change
-- **THEN** the tab bar includes a fifth tab labeled `changes (N)` where N is the number of changed files
+- **THEN** the tab bar includes a tab labeled `code (N)` where N is the number of changed files
 
 #### Scenario: Tab hidden outside git repo
 - **GIVEN** the project is NOT inside a git worktree
 - **WHEN** the TUI starts
-- **THEN** the tab bar does NOT include the `changes` tab
+- **THEN** the tab bar does NOT include the `code` tab
 
 #### Scenario: Tab disabled when working tree is clean
 - **GIVEN** the project is inside a git worktree with no changed files
 - **WHEN** the TUI is in normal mode
-- **THEN** the `changes` tab is shown as disabled (grayed out) and is not selectable
+- **THEN** the `code` tab is shown as disabled (grayed out) and is not selectable
+
+#### Scenario: Tab hidden in archive mode
+- **GIVEN** the user is viewing an archived change
+- **WHEN** the tab bar is rendered
+- **THEN** the `code` tab is not shown at all
 
 #### Scenario: Tab becomes enabled when files appear
-- **GIVEN** the changes tab is disabled with a clean working tree
+- **GIVEN** the code tab is disabled with a clean working tree
 - **WHEN** a file is modified on disk (detected by polling)
+- **THEN** within a maximum of 500 ms the tab becomes enabled and shows the file count
 - **THEN** within a maximum of 500 ms the tab becomes enabled and shows the file count
 
 #### Scenario: Working tree clean shows no count

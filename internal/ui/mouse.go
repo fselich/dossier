@@ -105,7 +105,7 @@ func (m Model) handleMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) {
 	for t := Tab(0); t < tabCount; t++ {
 		label := tabLabels[t]
 		if t == TabGit && len(m.gitState.Files) > 0 {
-			label = "changes (" + fmt.Sprintf("%d", len(m.gitState.Files)) + ")"
+			label = "code (" + fmt.Sprintf("%d", len(m.gitState.Files)) + ")"
 		}
 		w := len(label) + 2
 		if msg.X >= x && msg.X <= x+w-1 {

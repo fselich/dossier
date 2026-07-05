@@ -34,7 +34,7 @@ const (
 	tabCount
 )
 
-var tabLabels = [tabCount]string{"proposal", "design", "specs", "tasks", "changes"}
+var tabLabels = [tabCount]string{"proposal", "design", "specs", "tasks", "code"}
 
 type errClearMsg struct{}
 type editorReturnMsg struct{}

@@ -2,6 +2,12 @@
 
 # Changelog
 
+## v0.16.1
+
+### Cambiado
+- La pestaña de git se renombró de `changes` a `code`. El nombre anterior era ambiguo con los cambios de OpenSpec.
+- La pestaña de git se oculta en el modo archive — no tenía sentido ahí y solo añadía ruido.
+
 ## v0.16.0
 
 ### Añadido
