@@ -95,3 +95,47 @@ The TUI SHALL poll `git status --porcelain` on the same 500ms tick used for arti
 - **GIVEN** the user is on the `proposal` tab and a file was modified
 - **WHEN** the user switches to the `changes` tab
 - **THEN** the modified file appears in the list without waiting for the next tick
+
+### Requirement: Diff view toggle within git changes tab
+
+The TUI SHALL allow the user to view the diff of a file in the git changes tab by pressing `d`. For tracked files, the TUI SHALL parse the raw `git diff` output into structured lines with line numbers (`OldNum`/`NewNum`), render them with chroma syntax highlighting, display line numbers (4-char columns), and support horizontal scrolling via `h`/`l` keys (10 runes per step) by truncating raw content before chroma tokenization to avoid ANSI corruption. For untracked files (`??`), the TUI SHALL read the file contents and render them with chroma syntax highlighting. Pressing `d` or `Esc` in the diff view SHALL reset scroll to zero and return to the file list. The diff content SHALL be invalidated when git status changes.
+
+#### Scenario: Press d on modified tracked file shows syntax-highlighted diff
+- **GIVEN** the git changes tab is open and the cursor is on a modified tracked file
+- **WHEN** the user presses `d`
+- **THEN** the viewport shows the diff with chroma syntax highlighting, line numbers, and background tints for additions (green) and removals (red)
+
+#### Scenario: Press d on untracked file shows syntax-highlighted content
+- **GIVEN** the git changes tab is open and the cursor is on an untracked file (`??`)
+- **WHEN** the user presses `d`
+- **THEN** the viewport shows the file contents with chroma syntax highlighting and line numbers
+
+#### Scenario: Press d or Esc returns to file list
+- **GIVEN** the diff view is showing
+- **WHEN** the user presses `d` or `Esc`
+- **THEN** the viewport returns to the file list and the cursor is on the same file
+
+#### Scenario: Horizontal scroll reveals overflow content
+- **GIVEN** the diff view shows a line wider than the viewport
+- **WHEN** the user presses `h` or `l` (or arrow keys)
+- **THEN** the content shifts left or right by 10 runes, revealing previously hidden code; scroll resets to 0 on return to file list
+
+#### Scenario: Line numbers in diff view
+- **GIVEN** the diff view is showing
+- **WHEN** the user views the diff
+- **THEN** each code line shows its line number (4-char) from the file; added lines show new number, removed lines show old number, context lines show both
+
+#### Scenario: Diff content invalidated on status change
+- **GIVEN** the diff view is showing for a file
+- **WHEN** the git status changes (e.g., file is modified externally)
+- **THEN** the diff content is cleared, scroll resets, and the file list is shown
+
+#### Scenario: j/k scroll within diff view
+- **GIVEN** the diff view is showing
+- **WHEN** the user presses `j` or `k`
+- **THEN** the diff content scrolls vertically via the viewport
+
+#### Scenario: d does nothing on clean working tree
+- **GIVEN** the working tree is clean (showing "working tree clean" message)
+- **WHEN** the user presses `d`
+- **THEN** nothing happens
