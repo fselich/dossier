@@ -2,6 +2,13 @@
 
 # Changelog
 
+## v0.16.0
+
+### Añadido
+
+- Nueva pestaña `changes` (tecla `5`) en el visor de cambios que muestra los ficheros modificados del working tree de git. Ficheros modificados, añadidos, untracked, renombrados y borrados aparecen con indicadores de estado (`·M` sin staged, `M·` staged, `MM` en ambos).
+- Pulsa `d` (o `Enter`/`e`) sobre un fichero en la pestaña de cambios para ver su diff con syntax highlighting completo.
+
 ## v0.15.0
 
 ### Añadido

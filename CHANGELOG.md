@@ -2,6 +2,12 @@
 
 # Changelog
 
+## v0.16.0
+
+### Added
+- New `changes` tab (key `5`) in the change viewer showing git working-tree file changes. Modified, added, untracked, renamed, and deleted files appear with status indicators (`·M` for unstaged, `M·` for staged, `MM` for both).
+- Press `d` (or `Enter`/`e`) on a file in the changes tab to view its diff inline with full syntax highlighting.
+
 ## v0.15.0
 
 ### Added
