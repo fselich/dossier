@@ -294,10 +294,14 @@ func (m *Model) toggleGitDiff() {
 		m.refreshGitViewport()
 		return
 	}
-	if m.gitState.Cursor >= len(m.gitState.Files) {
+	m.loadDiffForFile(m.gitState.Cursor)
+}
+
+func (m *Model) loadDiffForFile(cursor int) {
+	if cursor >= len(m.gitState.Files) {
 		return
 	}
-	f := m.gitState.Files[m.gitState.Cursor]
+	f := m.gitState.Files[cursor]
 	if f.IsDeleted {
 		return
 	}

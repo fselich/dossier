@@ -18,19 +18,50 @@ func (m *Model) pollGitStatus() {
 	if gitStatusesEqual(m.gitState.Files, files) {
 		return
 	}
+
+	preserveDiff := m.gitState.ShowingDiff && m.gitState.DiffFile != "" &&
+		diffViewPreservable(m.gitState.DiffFile, files, m.gitState.Files)
+
 	m.gitState.Files = files
-	m.gitState.ShowingDiff = false
-	m.gitState.DiffLines = nil
-	m.gitState.DiffFile = ""
-	m.gitState.ScrollX = 0
-	if m.gitState.Cursor >= len(files) {
-		m.gitState.Cursor = 0
-	} else if m.gitState.Cursor > 0 {
-		m.gitState.Cursor = clampGitCursor(m.gitState.Cursor, files)
+
+	if preserveDiff {
+		if m.gitState.Cursor >= len(files) {
+			m.gitState.Cursor = 0
+		}
+	} else {
+		m.gitState.ShowingDiff = false
+		m.gitState.DiffLines = nil
+		m.gitState.DiffFile = ""
+		m.gitState.ScrollX = 0
+		if m.gitState.Cursor >= len(files) {
+			m.gitState.Cursor = 0
+		} else if m.gitState.Cursor > 0 {
+			m.gitState.Cursor = clampGitCursor(m.gitState.Cursor, files)
+		}
 	}
 	if m.tab == TabGit {
 		m.refreshGitViewport()
 	}
+}
+
+func diffViewPreservable(diffFile string, newFiles, oldFiles []git.FileStatus) bool {
+	var newStatus, oldStatus *git.FileStatus
+	for i := range newFiles {
+		if newFiles[i].Path == diffFile {
+			newStatus = &newFiles[i]
+			break
+		}
+	}
+	for i := range oldFiles {
+		if oldFiles[i].Path == diffFile {
+			oldStatus = &oldFiles[i]
+			break
+		}
+	}
+	if newStatus == nil || oldStatus == nil {
+		return false
+	}
+	return newStatus.X == oldStatus.X && newStatus.Y == oldStatus.Y
 }
 
 func gitStatusesEqual(a, b []git.FileStatus) bool {

@@ -31,7 +31,7 @@ func WorkTreeRoot(root string) string {
 }
 
 func Status(root string) ([]FileStatus, error) {
-	cmd := exec.Command("git", "-C", root, "status", "--porcelain")
+	cmd := exec.Command("git", "-C", root, "status", "--porcelain", "-u")
 	out, err := cmd.Output()
 	if err != nil {
 		return nil, err

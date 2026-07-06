@@ -221,7 +221,7 @@ func (m *Model) renderHelpBar() string {
 	}
 	if m.tab == TabGit {
 		if m.gitState.ShowingDiff {
-			return helpStyle.Render("d/Esc: back  j/k: vertical  h/l: ←→ horizontal  q: quit")
+			return helpStyle.Render("d/Esc: back  [/]: prev/next  j/k: vertical  h/l: ←→ horizontal  q: quit")
 		}
 		return helpStyle.Render("h/l: change  " + tabRange + "/Tab: artifact  j/k: navigate  Enter/e: open file  d: view diff  Esc: index  q: quit")
 	}

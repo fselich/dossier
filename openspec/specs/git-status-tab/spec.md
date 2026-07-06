@@ -43,7 +43,7 @@ The TUI SHALL show a tab labeled `code` in the tab bar when running inside a git
 
 ### Requirement: List of changed files with status indicators
 
-The TUI SHALL display files from `git status --porcelain` as a selectable list in the `changes` tab. Each file SHALL show a two-character status code that indicates index (staged) and worktree status. Files SHALL include: modified, added, untracked, renamed, and deleted. Files under the `openspec/` directory SHALL be excluded from the list. When the working tree is clean, the view SHALL show `(working tree clean)`.
+The TUI SHALL display files from `git status --porcelain -u` as a selectable list in the `changes` tab. Each file SHALL show a two-character status code that indicates index (staged) and worktree status. Files SHALL include: modified, added, untracked, renamed, and deleted. Files under the `openspec/` directory SHALL be excluded from the list. When the working tree is clean, the view SHALL show `(working tree clean)`. Untracked files in new directories SHALL appear as individual file entries (e.g., `?? src/Domain/Cache/CacheInterface.php`) rather than being collapsed into a directory entry (`?? src/Domain/Cache/`).
 
 #### Scenario: Shows modified, added, untracked, renamed, deleted
 - **GIVEN** the working tree has modified (`M`), added (`A`), untracked (`??`), renamed (`R`), and deleted (`D`) files
@@ -59,6 +59,11 @@ The TUI SHALL display files from `git status --porcelain` as a selectable list i
 - **GIVEN** the working tree has no changed files
 - **WHEN** the user opens the `changes` tab
 - **THEN** the view shows `(working tree clean)`
+
+#### Scenario: Untracked files in new directories show individually
+- **GIVEN** the working tree has untracked files inside a new directory `src/Domain/Cache/`
+- **WHEN** the user opens the `changes` tab
+- **THEN** each file appears individually (e.g., `?? src/Domain/Cache/CacheInterface.php`) instead of a single `?? src/Domain/Cache/` entry
 
 ### Requirement: Cursor navigation skips deleted files
 
@@ -114,7 +119,7 @@ The TUI SHALL poll `git status --porcelain` on the same 500ms tick used for arti
 
 ### Requirement: Diff view toggle within git changes tab
 
-The TUI SHALL allow the user to view the diff of a file in the git changes tab by pressing `d`, `Enter`, or `e`. For tracked files, the TUI SHALL parse the raw `git diff` output into structured lines with line numbers (`OldNum`/`NewNum`), render them with chroma syntax highlighting, display line numbers (4-char columns), and support horizontal scrolling via `h`/`l` keys (10 runes per step) by truncating raw content before chroma tokenization to avoid ANSI corruption. For untracked files (`??`), the TUI SHALL read the file contents and render them with chroma syntax highlighting. Pressing `d` or `Esc` in the diff view SHALL reset scroll to zero and return to the file list. The TUI SHALL NOT open the system editor from the git changes tab. The diff content SHALL be invalidated when git status changes.
+The TUI SHALL allow the user to view the diff of a file in the git changes tab by pressing `d`, `Enter`, or `e`. For tracked files, the TUI SHALL parse the raw `git diff` output into structured lines with line numbers (`OldNum`/`NewNum`), render them with chroma syntax highlighting, display line numbers (4-char columns), and support horizontal scrolling via `h`/`l` keys (10 runes per step) by truncating raw content before chroma tokenization to avoid ANSI corruption. For untracked files (`??`), the TUI SHALL read the file contents and render them with chroma syntax highlighting. Pressing `d` or `Esc` in the diff view SHALL reset scroll to zero and return to the file list. The TUI SHALL NOT open the system editor from the git changes tab. The diff content SHALL be cleared only when the viewed file itself changes on disk.
 
 #### Scenario: Press d on modified tracked file shows syntax-highlighted diff
 - **GIVEN** the git changes tab is open and the cursor is on a modified tracked file
@@ -130,6 +135,41 @@ The TUI SHALL allow the user to view the diff of a file in the git changes tab b
 - **GIVEN** the git changes tab is open and the cursor is on a file
 - **WHEN** the user presses `e`
 - **THEN** the diff view is shown for that file (same as pressing `d`)
+
+#### Scenario: Press `[` cycles to previous file diff
+- **GIVEN** the diff view is showing for file at cursor position N
+- **WHEN** the user presses `[`
+- **THEN** the cursor moves to the previous non-deleted file (N-1), the diff for that file is loaded, and the diff view remains active
+
+#### Scenario: Press `]` cycles to next file diff
+- **GIVEN** the diff view is showing for file at cursor position N
+- **WHEN** the user presses `]`
+- **THEN** the cursor moves to the next non-deleted file (N+1), the diff for that file is loaded, and the diff view remains active
+
+#### Scenario: Cycling wraps around at first file
+- **GIVEN** the diff view is showing for the first file (cursor = 0)
+- **WHEN** the user presses `[`
+- **THEN** the cursor wraps to the last non-deleted file, and its diff is loaded
+
+#### Scenario: Cycling wraps around at last file
+- **GIVEN** the diff view is showing for the last file
+- **WHEN** the user presses `]`
+- **THEN** the cursor wraps to the first non-deleted file, and its diff is loaded
+
+#### Scenario: Cycling skips deleted files
+- **GIVEN** the diff view is showing for file N, and file N+2 is the next non-deleted file (N+1 is deleted)
+- **WHEN** the user presses `]`
+- **THEN** the cursor skips N+1 and lands on N+2, and its diff is loaded
+
+#### Scenario: Scroll resets when cycling to a new file
+- **GIVEN** the diff view for file A has been scrolled horizontally (`ScrollX > 0`)
+- **WHEN** the user presses `]` to cycle to file B
+- **THEN** the horizontal scroll resets to 0 for the new diff
+
+#### Scenario: Cycling is only available in diff view
+- **GIVEN** the file list is showing (not in diff view)
+- **WHEN** the user presses `[` or `]`
+- **THEN** nothing happens
 
 #### Scenario: Press d on untracked file shows syntax-highlighted content
 - **GIVEN** the git changes tab is open and the cursor is on an untracked file (`??`)
@@ -151,10 +191,20 @@ The TUI SHALL allow the user to view the diff of a file in the git changes tab b
 - **WHEN** the user views the diff
 - **THEN** each code line shows its line number (4-char) from the file; added lines show new number, removed lines show old number, context lines show both
 
-#### Scenario: Diff content invalidated on status change
-- **GIVEN** the diff view is showing for a file
-- **WHEN** the git status changes (e.g., file is modified externally)
-- **THEN** the diff content is cleared, scroll resets, and the file list is shown
+#### Scenario: Diff preserved when unrelated files change
+- **GIVEN** the diff view is showing for `src/a.go`
+- **WHEN** an unrelated file `src/b.go` is modified on disk (detected by polling)
+- **THEN** the diff view for `src/a.go` remains visible and the viewport does not reset
+
+#### Scenario: Diff cleared when viewed file itself changes
+- **GIVEN** the diff view is showing for `src/a.go`
+- **WHEN** `src/a.go` itself is modified on disk (detected by polling)
+- **THEN** the diff content is cleared, scroll resets to zero, and the file list is shown
+
+#### Scenario: Diff cleared when viewed file is removed
+- **GIVEN** the diff view is showing for `src/a.go`
+- **WHEN** `src/a.go` is deleted on disk
+- **THEN** the diff content is cleared, scroll resets to zero, and the file list is shown
 
 #### Scenario: j/k scroll within diff view
 - **GIVEN** the diff view is showing

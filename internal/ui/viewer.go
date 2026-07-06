@@ -70,6 +70,20 @@ func (m Model) updateViewer(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.refreshGitViewport()
 		}
 
+	case "]":
+		if m.tab == TabGit && m.gitState.ShowingDiff {
+			m.moveGitCursorDown()
+			m.loadDiffForFile(m.gitState.Cursor)
+			return m, nil
+		}
+
+	case "[":
+		if m.tab == TabGit && m.gitState.ShowingDiff {
+			m.moveGitCursorUp()
+			m.loadDiffForFile(m.gitState.Cursor)
+			return m, nil
+		}
+
 	case "1":
 		if m.tabAvailable(TabProposal) {
 			m.tab = TabProposal
