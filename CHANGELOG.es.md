@@ -2,6 +2,13 @@
 
 # Changelog
 
+## v0.17.0
+
+### Añadido
+- Las teclas `[` y `]` permiten navegar entre archivos mientras se ve un diff en la pestaña code.
+- Los archivos untracked ahora aparecen en la lista de archivos de la pestaña code.
+- La vista de diff se preserva cuando los cambios de estado no afectan al diff actual.
+
 ## v0.16.1
 
 ### Cambiado

@@ -2,6 +2,13 @@
 
 # Changelog
 
+## v0.17.0
+
+### Added
+- `[` and `]` keys cycle through files while viewing a diff in the code tab
+- Untracked files now appear in the code tab's file list
+- Diff view is preserved when file status changes don't affect the current diff
+
 ## v0.16.1
 
 ### Changed
