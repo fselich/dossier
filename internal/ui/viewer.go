@@ -153,6 +153,17 @@ func (m Model) updateViewer(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.vp.ScrollDown(1)
 		}
 
+	case "pgdown":
+		switch m.tab {
+		case TabTasks:
+		case TabGit:
+			if m.gitState.ShowingDiff {
+				m.vp.PageDown()
+			}
+		default:
+			m.vp.PageDown()
+		}
+
 	case "k", "up":
 		switch m.tab {
 		case TabTasks:
@@ -167,6 +178,17 @@ func (m Model) updateViewer(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			}
 		default:
 			m.vp.ScrollUp(1)
+		}
+
+	case "pgup":
+		switch m.tab {
+		case TabTasks:
+		case TabGit:
+			if m.gitState.ShowingDiff {
+				m.vp.PageUp()
+			}
+		default:
+			m.vp.PageUp()
 		}
 
 	case "space":
