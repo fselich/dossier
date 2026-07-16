@@ -6,12 +6,14 @@ Dossier renders markdown with Glamour's hardcoded `dark` standard style. On ligh
 
 - Read `DOSSIER_GLAMOUR_STYLE` when constructing the cached Glamour renderer.
 - Keep the existing `dark` style as the default when the environment variable is unset.
+- Make available inactive tabs readable on light terminal palettes.
+- Cap the top tab-bar progress indicator so it does not consume all remaining horizontal space.
 - Add a focused unit test for default and override selection.
 
 ## Non-goals
 
 - No UI setting or config file is added.
-- No changes are made to Lipgloss chrome, task rendering, or git diff highlighting.
+- No changes are made to task rendering or git diff highlighting.
 - No validation layer for custom Glamour style names is added.
 
 ## Capabilities
@@ -23,5 +25,6 @@ Dossier renders markdown with Glamour's hardcoded `dark` standard style. On ligh
 ## Impact
 
 - **Affected code**: `internal/ui/viewport.go`, `internal/ui/viewport_test.go`
+- **Affected chrome**: `internal/ui/styles.go`, `internal/ui/view.go`
 - **Dependencies**: none
 - **User behavior**: existing behavior remains unchanged unless `DOSSIER_GLAMOUR_STYLE` is set before launching `dossier`

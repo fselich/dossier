@@ -19,7 +19,7 @@ var (
 				Background(lipgloss.Color("4"))
 
 	tabInactiveStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("15")).
+				Foreground(lipgloss.Color("12")).
 				Padding(0, 1)
 
 	tabDisabledStyle = lipgloss.NewStyle().

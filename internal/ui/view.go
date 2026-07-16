@@ -128,12 +128,17 @@ func (m *Model) renderTabBar() string {
 	if total > 0 {
 		label := fmt.Sprintf(" %d/%d", done, total)
 		barSpace := (m.width - 2) - lipgloss.Width(tabs) - 3 - len(label)
+		if barSpace > tabProgressMaxWidth {
+			barSpace = tabProgressMaxWidth
+		}
 		if barSpace >= 3 {
 			tabs = tabs + " [" + renderProgressBar(done, total, barSpace, "█", "░") + "]" + helpStyle.Render(label)
 		}
 	}
 	return tabs
 }
+
+const tabProgressMaxWidth = 24
 
 func (m *Model) renderSpecSubnav() string {
 	ch := m.current()

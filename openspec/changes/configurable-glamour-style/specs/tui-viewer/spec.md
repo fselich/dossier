@@ -18,3 +18,14 @@ The TUI SHALL render `proposal`, `design`, and `specs` artifacts using glamour w
 #### Scenario: Environment-selected Glamour style
 - **WHEN** `DOSSIER_GLAMOUR_STYLE` is set to `light`
 - **THEN** the markdown renderer uses Glamour's `light` standard style
+
+### Requirement: Tabs de artifact
+The TUI SHALL show a tab bar with tabs `proposal`, `design`, `tasks`, `specs`, and `code` when the git tab is available. Tabs for absent artifacts SHALL be shown visually disabled and not selectable. Available inactive tabs SHALL remain readable on both light and dark terminal palettes. When the tab bar includes a task progress indicator, that indicator SHALL be compact and SHALL NOT consume all remaining horizontal space on wide terminals.
+
+#### Scenario: Available inactive tabs remain readable
+- **WHEN** the terminal uses a light color palette and an available tab is inactive
+- **THEN** the tab label is rendered with a visible foreground color
+
+#### Scenario: Top progress indicator is compact
+- **WHEN** tasks exist and the terminal is wide
+- **THEN** the tab-bar progress indicator uses a bounded width instead of filling all remaining columns
