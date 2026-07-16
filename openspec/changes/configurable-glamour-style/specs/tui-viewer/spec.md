@@ -29,3 +29,18 @@ The TUI SHALL show a tab bar with tabs `proposal`, `design`, `tasks`, `specs`, a
 #### Scenario: Top progress indicator is compact
 - **WHEN** tasks exist and the terminal is wide
 - **THEN** the tab-bar progress indicator uses a bounded width instead of filling all remaining columns
+
+### Requirement: Tasks tab focus rendering
+The TUI SHALL keep task-list text and checkboxes readable when keyboard focus moves through the tasks tab. Section headers SHALL keep their section-header style while focused. Checked and unchecked task rows SHALL keep their checkbox and task text visible while focused.
+
+#### Scenario: Focused section header keeps section style
+- **WHEN** keyboard focus is on a section header in the tasks tab
+- **THEN** the section title remains visible and uses the same section-header text style as unfocused section headers
+
+#### Scenario: Focused unchecked task remains visible
+- **WHEN** keyboard focus is on an unchecked task
+- **THEN** the `[ ]` checkbox and task text remain visible
+
+#### Scenario: Focused checked task remains visible
+- **WHEN** keyboard focus is on a checked task
+- **THEN** the `[x]` checkbox and task text remain visible

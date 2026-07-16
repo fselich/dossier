@@ -11,3 +11,9 @@
 - [x] 2.1 Make inactive available tabs readable on light terminal palettes
 - [x] 2.2 Cap the top tab-bar progress indicator width
 - [x] 2.3 Validate, rebuild, reinstall, and manually test the updated TUI
+
+## 3. Fix light-theme task focus chrome
+
+- [x] 3.1 Keep focused section header text in the section style
+- [x] 3.2 Keep focused checked and unchecked task checkboxes visible
+- [x] 3.3 Validate, rebuild, reinstall, and manually test task focus/toggle behavior

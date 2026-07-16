@@ -32,13 +32,13 @@ var (
 
 	taskCursorMarkStyle = lipgloss.NewStyle().
 				Bold(true).
-				Foreground(lipgloss.Color("15"))
+				Foreground(lipgloss.Color("12"))
 
 	taskDoneStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("8"))
 
 	taskPendingStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("7"))
+				Foreground(lipgloss.Color("0"))
 
 	helpStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("8"))

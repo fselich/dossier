@@ -132,7 +132,7 @@ func (m *Model) renderTasksContent() (string, int) {
 				prefix = taskCursorMarkStyle.Render("▶") + " "
 			}
 			done, total := sectionProgress(m.tasks.Items, i)
-			sectionLine := sectionStyle.Render(prefix+item.Text) + "  " + progressBar(done, total, 5)
+			sectionLine := prefix + sectionStyle.Render(item.Text) + "  " + progressBar(done, total, 5)
 			sb.WriteString(sectionLine + "\n")
 			line += lipgloss.Height(sectionLine)
 			sb.WriteString("\n")
@@ -151,18 +151,21 @@ func (m *Model) renderTasksContent() (string, int) {
 			}
 			var prefix string
 			if i == m.tasks.Cursor {
-				prefix = taskCursorMarkStyle.Render("▶") + restore + " "
-				checkbox = taskCursorMarkStyle.Render(checkbox) + restore
+				prefix = taskCursorMarkStyle.Render("▶") + " "
 			} else {
 				prefix = "  "
 			}
-			text := prefix + checkbox + " " + inlineMarkdown(item.Text, restore, item.Done)
+			text := checkbox + " " + inlineMarkdown(item.Text, restore, item.Done)
+			taskWidth := contentWidth - lipgloss.Width(prefix)
+			if taskWidth < 1 {
+				taskWidth = 1
+			}
 			var rendered string
 			switch {
 			case item.Done:
-				rendered = taskDoneStyle.Width(contentWidth).Render(text)
+				rendered = prefix + taskDoneStyle.Width(taskWidth).Render(text)
 			default:
-				rendered = taskPendingStyle.Width(contentWidth).Render(text)
+				rendered = prefix + taskPendingStyle.Width(taskWidth).Render(text)
 			}
 			sb.WriteString(rendered + "\n")
 			line += lipgloss.Height(rendered)
