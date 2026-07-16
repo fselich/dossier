@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"os"
 	"regexp"
 	"strings"
 
@@ -34,7 +35,7 @@ func (m *Model) ensureRenderer(width int) {
 		return
 	}
 	r, err := glamour.NewTermRenderer(
-		glamour.WithStandardStyle("dark"),
+		glamour.WithStandardStyle(glamourStyleName()),
 		glamour.WithWordWrap(width),
 	)
 	if err != nil {
@@ -178,4 +179,14 @@ func (m *Model) renderWidth() int {
 		width = 80
 	}
 	return width
+}
+
+const glamourStyleEnv = "DOSSIER_GLAMOUR_STYLE"
+
+func glamourStyleName() string {
+	style := os.Getenv(glamourStyleEnv)
+	if style == "" {
+		style = "dark"
+	}
+	return style
 }
