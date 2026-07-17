@@ -2,6 +2,18 @@
 
 # Changelog
 
+## v0.18.0
+
+### Added
+- Press `s` on any file in the code tab to stage or unstage it. If the file has unstaged changes (including untracked files), it stages them; if it's fully staged, it unstages them. Works with deleted files, mixed states (`MM`), and renames. The list refreshes instantly and the cursor stays on the file you just toggled.
+- The cursor now lands on deleted files in the code tab — you can stage a deletion by pressing `s`. Pressing `d`, `Enter`, or `e` on a deleted file still does nothing, as expected.
+- Error messages from failed git commands (e.g., another process holding `index.lock`) appear in the help bar and clear on the next key press or status change.
+
+### Internal
+- All git subprocess calls now enforce a 2-second timeout via `context.WithTimeout`, so a hanging git can never freeze the TUI.
+- Git porcelain output parsing uses `-z` (NUL-separated), correctly handling filenames with spaces, quotes, unicode, and even newlines.
+- `Stage()` and `Unstage()` functions added to the git package, built on the same hardened subprocess helper. Unstaging falls back to `git rm --cached` when HEAD is unresolvable (fresh repo with no commits).
+
 ## v0.17.0
 
 ### Added

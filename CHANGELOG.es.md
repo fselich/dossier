@@ -2,6 +2,18 @@
 
 # Changelog
 
+## v0.18.0
+
+### Añadido
+- Pulsa `s` sobre cualquier fichero en la pestaña code para añadirlo al stage o quitarlo. Si el fichero tiene cambios sin staged (incluyendo untracked), los añade al stage; si ya está completamente staged, lo saca. Funciona con ficheros borrados, estados mixtos (`MM`) y renames. La lista se actualiza al instante y el cursor se queda en el mismo fichero.
+- El cursor ya puede posarse sobre ficheros borrados en la pestaña code — puedes añadir un borrado al stage pulsando `s`. Pulsar `d`, `Enter` o `e` en un fichero borrado sigue sin hacer nada, como es debido.
+- Los errores de git (por ejemplo, cuando otro proceso bloquea `index.lock`) aparecen en la barra de ayuda y se limpian al pulsar cualquier tecla o al siguiente cambio de estado.
+
+### Interno
+- Todas las llamadas a subprocesos de git tienen un timeout de 2 segundos via `context.WithTimeout`. Un git colgado ya no puede congelar el TUI.
+- El parseo de git porcelain usa `-z` (separado por NUL), manejando correctamente ficheros con espacios, comillas, unicode e incluso saltos de línea.
+- Se añadieron `Stage()` y `Unstage()` al paquete git, usando el mismo helper robusto de subprocesos. Unstage usa `git rm --cached` cuando HEAD no es resoluble (repo nuevo sin commits).
+
 ## v0.17.0
 
 ### Añadido
