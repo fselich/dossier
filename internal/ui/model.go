@@ -176,7 +176,11 @@ func New(project *openspec.Project, cfg openspec.ProjectConfig, root string, loa
 		isGitRepo:     git.IsInsideWorkTree(root),
 	}
 	if m.isGitRepo {
-		m.gitRoot = git.WorkTreeRoot(root)
+		if r, err := git.WorkTreeRoot(root); err == nil {
+			m.gitRoot = r
+		} else {
+			m.gitRoot = root
+		}
 	}
 	m.pollGitStatus()
 	if len(project.Changes) > 0 {

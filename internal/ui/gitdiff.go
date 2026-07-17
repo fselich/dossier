@@ -3,7 +3,6 @@ package ui
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -13,6 +12,7 @@ import (
 	"github.com/alecthomas/chroma/v2"
 	"github.com/alecthomas/chroma/v2/lexers"
 	"github.com/alecthomas/chroma/v2/styles"
+	"github.com/fselich/dossier/internal/git"
 )
 
 type DiffLineType int
@@ -245,21 +245,21 @@ func computeDiffLines(root string, x, y byte, rel, oldPath string) []DiffLine {
 	if len(rel) == 0 {
 		return nil
 	}
-	var cmds []*exec.Cmd
+	var argsList [][]string
 	switch {
 	case x == ' ' && y != ' ':
-		cmds = []*exec.Cmd{exec.Command("git", "-C", root, "diff", "--", rel)}
+		argsList = [][]string{{"diff", "--", rel}}
 	case x != ' ' && y == ' ':
-		cmds = []*exec.Cmd{exec.Command("git", "-C", root, "diff", "--cached", "--", rel)}
+		argsList = [][]string{{"diff", "--cached", "--", rel}}
 	default:
-		cmds = []*exec.Cmd{
-			exec.Command("git", "-C", root, "diff", "HEAD", "--", rel),
-			exec.Command("git", "-C", root, "diff", "--cached", "--", rel),
-			exec.Command("git", "-C", root, "diff", "--", rel),
+		argsList = [][]string{
+			{"diff", "HEAD", "--", rel},
+			{"diff", "--cached", "--", rel},
+			{"diff", "--", rel},
 		}
 	}
-	for _, cmd := range cmds {
-		out, err := cmd.Output()
+	for _, args := range argsList {
+		out, err := git.RunGit(root, args...)
 		if err == nil && len(out) > 0 {
 			return parseDiff(string(out))
 		}

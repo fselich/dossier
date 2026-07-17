@@ -60,7 +60,7 @@ openspec/                   # OpenSpec project artifacts (not Go code)
 
 ## Key Gotchas & Non-Obvious Patterns
 
-1. **Go 1.25.x** — latest Go. No generics. No `context.Context`. No `errors` package (plain `fmt.Errorf`).
+1. **Go 1.25.x** — latest Go. No generics. `context.Context` used only locally for subprocess timeouts (never plumbed through APIs). No `errors` package (plain `fmt.Errorf`).
 2. **Value vs pointer receivers**: `updateConfig`, `updateViewer`, `updateSpec`, `dispatchKey` all take `Model` (value). Mutating methods (`buildIndexItems`, `refreshIndexViewport`, `loadTaskItems`, `pollGitStatus`, `moveGitCursor*`) use `*Model`. `Update` returns a new `Model`.
 3. **Two-tier openspec API**: Every `Loader` method has a package-level wrapper (e.g., `loader.LoadFrom` → `openspec.LoadFromFrom`). Zero-argument forms (`Load()`, `LoadConfig()`) exist but are unused internally — they call `os.Getwd()`.
 4. **`artifactPath()` uses direct `os.ReadDir/Stat`** (not `fileSystem` interface) — a testability gap in specs tab path resolution.
@@ -69,7 +69,7 @@ openspec/                   # OpenSpec project artifacts (not Go code)
 7. **`.openspec.yaml` parse errors silently ignored** (optional metadata).
 8. **`renderCache` cleared on three events**: change switch, window resize, mode switch. `editorReturnMsg` deletes only the current tab's cache.
 9. **`commitStateChange()`** adjusts viewport height and calls `loadViewport()` — used after every mode/tab/change change.
-10. **Git porcelain parsing**: `XY path` format — `X`/`Y` are index/worktree status, separator at `[2]`, path starts at `[3:]`. Renames/copies split on ` -> `. Files under `openspec/` are filtered out. Never use `strings.TrimSpace` on the raw output (it strips leading whitespace, corrupting first-line XY codes) — use `strings.TrimRight(raw, "\n\r")` instead.
+10. **Git porcelain parsing**: uses `git status --porcelain=v1 -z -u`. Output is NUL-separated: each entry is `XY <path>\0` (3-byte header + path). Renames/copies: `R <old_path>\0<new_path>\0` — the entry token has the old path, the next NUL token has the new path (`Path` = new, `OldPath` = old). All git subprocess calls go through the exported `RunGit(dir, args...)` helper in `internal/git`, which enforces a 2s timeout via `context.WithTimeout` + `exec.CommandContext`. Files under `openspec/` are filtered out.
 11. **Git cursor skips deleted files**: `moveGitCursorDown/Up` wraps via modulo and skips `IsDeleted`. `clampGitCursor` scans forward then backward.
 12. **Git status poll is always-on**: `pollGitStatus()` runs every tick (guarded by `isGitRepo`), refreshes viewport only when `TabGit` is active.
 13. **Git tab label is dynamic**: `changes` when clean, `changes (N)` when files exist.

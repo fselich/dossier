@@ -1,9 +1,14 @@
 package git
 
 import (
+	"context"
+	"fmt"
 	"os/exec"
 	"strings"
+	"time"
 )
+
+const gitTimeout = 2 * time.Second
 
 type FileStatus struct {
 	X, Y      byte
@@ -12,49 +17,53 @@ type FileStatus struct {
 	IsDeleted bool
 }
 
+func RunGit(dir string, args ...string) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), gitTimeout)
+	defer cancel()
+	gitArgs := append([]string{"-C", dir}, args...)
+	cmd := exec.CommandContext(ctx, "git", gitArgs...)
+	return cmd.Output()
+}
+
 func IsInsideWorkTree(root string) bool {
-	cmd := exec.Command("git", "-C", root, "rev-parse", "--is-inside-work-tree")
-	out, err := cmd.Output()
+	out, err := RunGit(root, "rev-parse", "--is-inside-work-tree")
 	if err != nil {
 		return false
 	}
 	return strings.TrimSpace(string(out)) == "true"
 }
 
-func WorkTreeRoot(root string) string {
-	cmd := exec.Command("git", "-C", root, "rev-parse", "--show-toplevel")
-	out, err := cmd.Output()
+func WorkTreeRoot(root string) (string, error) {
+	out, err := RunGit(root, "rev-parse", "--show-toplevel")
 	if err != nil {
-		return root
+		return "", fmt.Errorf("git rev-parse --show-toplevel: %w", err)
 	}
-	return strings.TrimSpace(string(out))
+	return strings.TrimSpace(string(out)), nil
 }
 
 func Status(root string) ([]FileStatus, error) {
-	cmd := exec.Command("git", "-C", root, "status", "--porcelain", "-u")
-	out, err := cmd.Output()
+	out, err := RunGit(root, "status", "--porcelain=v1", "-z", "-u")
 	if err != nil {
 		return nil, err
 	}
-	raw := strings.TrimRight(string(out), "\n\r")
-	if raw == "" {
+	if len(out) == 0 {
 		return nil, nil
 	}
-	lines := strings.Split(raw, "\n")
-	files := make([]FileStatus, 0, len(lines))
-	for _, line := range lines {
-		if len(line) < 4 {
+	parts := strings.Split(string(out), "\x00")
+	files := make([]FileStatus, 0, len(parts))
+	for i := 0; i < len(parts); i++ {
+		p := parts[i]
+		if len(p) < 4 {
 			continue
 		}
-		fs := FileStatus{X: line[0], Y: line[1]}
-		path := line[3:]
+		fs := FileStatus{X: p[0], Y: p[1]}
+		path := p[3:]
 
 		if fs.X == 'R' || fs.Y == 'R' || fs.X == 'C' || fs.Y == 'C' {
-			if idx := strings.Index(path, " -> "); idx >= 0 {
-				fs.OldPath = path[:idx]
-				fs.Path = path[idx+4:]
-			} else {
-				fs.Path = path
+			fs.OldPath = path
+			i++
+			if i < len(parts) {
+				fs.Path = parts[i]
 			}
 		} else {
 			fs.Path = path
