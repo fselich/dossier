@@ -367,6 +367,144 @@ func TestStatusNewlineInFilename(t *testing.T) {
 	}
 }
 
+func TestStageModified(t *testing.T) {
+	skipIfNoGit(t)
+	dir := initRepo(t, map[string]string{"a.txt": "hello"})
+
+	if err := os.WriteFile(filepath.Join(dir, "a.txt"), []byte("changed"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := Stage(dir, "a.txt"); err != nil {
+		t.Fatalf("Stage: %v", err)
+	}
+	files, err := Status(dir)
+	if err != nil {
+		t.Fatalf("Status: %v", err)
+	}
+	if len(files) != 1 || files[0].X != 'M' || files[0].Y != ' ' {
+		t.Errorf("expected staged modified (M ), got %+v", files)
+	}
+}
+
+func TestStageUntracked(t *testing.T) {
+	skipIfNoGit(t)
+	dir := initRepo(t, nil)
+	mustRun(t, dir, "commit", "--allow-empty", "-m", "init")
+
+	if err := os.WriteFile(filepath.Join(dir, "new.go"), []byte("package main"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := Stage(dir, "new.go"); err != nil {
+		t.Fatalf("Stage: %v", err)
+	}
+	files, err := Status(dir)
+	if err != nil {
+		t.Fatalf("Status: %v", err)
+	}
+	if len(files) != 1 || files[0].X != 'A' || files[0].Y != ' ' {
+		t.Errorf("expected staged added (A ), got %+v", files)
+	}
+}
+
+func TestStageDeleted(t *testing.T) {
+	skipIfNoGit(t)
+	dir := initRepo(t, map[string]string{"del.txt": "bye"})
+
+	if err := os.Remove(filepath.Join(dir, "del.txt")); err != nil {
+		t.Fatal(err)
+	}
+	if err := Stage(dir, "del.txt"); err != nil {
+		t.Fatalf("Stage: %v", err)
+	}
+	files, err := Status(dir)
+	if err != nil {
+		t.Fatalf("Status: %v", err)
+	}
+	if len(files) != 1 || files[0].X != 'D' || files[0].Y != ' ' {
+		t.Errorf("expected staged delete (D ), got %+v", files)
+	}
+}
+
+func TestUnstageStaged(t *testing.T) {
+	skipIfNoGit(t)
+	dir := initRepo(t, map[string]string{"a.txt": "hello"})
+
+	if err := os.WriteFile(filepath.Join(dir, "a.txt"), []byte("changed"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	mustRun(t, dir, "add", "a.txt")
+
+	if err := Unstage(dir, "a.txt"); err != nil {
+		t.Fatalf("Unstage: %v", err)
+	}
+	files, err := Status(dir)
+	if err != nil {
+		t.Fatalf("Status: %v", err)
+	}
+	if len(files) != 1 || files[0].X != ' ' || files[0].Y != 'M' {
+		t.Errorf("expected unstaged modified ( M), got %+v", files)
+	}
+}
+
+func TestUnstageNoCommits(t *testing.T) {
+	skipIfNoGit(t)
+	dir := t.TempDir()
+	mustRun(t, dir, "init")
+	mustRun(t, dir, "config", "user.email", "test@test")
+	mustRun(t, dir, "config", "user.name", "Test")
+
+	if err := os.WriteFile(filepath.Join(dir, "new.go"), []byte("package main"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	mustRun(t, dir, "add", "new.go")
+
+	if err := Unstage(dir, "new.go"); err != nil {
+		t.Fatalf("Unstage (no commits): %v", err)
+	}
+	files, err := Status(dir)
+	if err != nil {
+		t.Fatalf("Status: %v", err)
+	}
+	if len(files) != 1 || files[0].X != '?' || files[0].Y != '?' {
+		t.Errorf("expected untracked (??), got %+v", files)
+	}
+}
+
+func TestUnstageRename(t *testing.T) {
+	skipIfNoGit(t)
+	dir := initRepo(t, map[string]string{"old.go": "package main\n"})
+
+	mustRun(t, dir, "mv", "old.go", "new.go")
+	mustRun(t, dir, "add", "new.go")
+
+	if err := Unstage(dir, "old.go", "new.go"); err != nil {
+		t.Fatalf("Unstage (rename): %v", err)
+	}
+	files, err := Status(dir)
+	if err != nil {
+		t.Fatalf("Status: %v", err)
+	}
+	if len(files) == 0 {
+		t.Fatal("expected files after unstage rename")
+	}
+	foundOld := false
+	foundNew := false
+	for _, f := range files {
+		if f.Path == "old.go" {
+			foundOld = true
+		}
+		if f.Path == "new.go" {
+			foundNew = true
+		}
+	}
+	if !foundOld {
+		t.Error("expected old.go to appear after unstage rename")
+	}
+	if !foundNew {
+		t.Error("expected new.go to appear after unstage rename")
+	}
+}
+
 func TestRunGitTimeout(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping timeout test in short mode")

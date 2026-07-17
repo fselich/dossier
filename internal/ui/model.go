@@ -93,6 +93,7 @@ type gitState struct {
 	DiffLines   []DiffLine
 	DiffFile    string
 	ScrollX     int
+	ErrMsg      string
 }
 
 type indexItemKind int

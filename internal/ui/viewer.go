@@ -3,15 +3,52 @@ package ui
 import (
 	"os"
 	"os/exec"
+	"strings"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/fselich/dossier/internal/git"
 )
 
 func (m Model) updateViewer(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	if m.tab == TabGit && m.gitState.ErrMsg != "" {
+		m.gitState.ErrMsg = ""
+	}
+
 	switch msg.String() {
 
 	case "q", "ctrl+c":
 		return m, tea.Quit
+
+	case "s":
+		if m.tab != TabGit || m.gitState.ShowingDiff || len(m.gitState.Files) == 0 {
+			return m, nil
+		}
+		f := m.gitState.Files[m.gitState.Cursor]
+
+		var err error
+		if f.Y != ' ' || f.X == '?' && f.Y == '?' {
+			paths := []string{f.Path}
+			if f.OldPath != "" {
+				paths = []string{f.OldPath, f.Path}
+			}
+			err = git.Stage(m.gitRoot, paths...)
+		} else {
+			paths := []string{f.Path}
+			if f.OldPath != "" {
+				paths = []string{f.OldPath, f.Path}
+			}
+			err = git.Unstage(m.gitRoot, paths...)
+		}
+		if err != nil {
+			m.gitState.ErrMsg = strings.TrimSpace(err.Error())
+		}
+		files, statusErr := git.Status(m.gitRoot)
+		if statusErr == nil {
+			m.gitState.Files = files
+		}
+		m.restoreGitCursor(f.Path)
+		m.refreshGitViewport()
+		return m, nil
 
 	case "i":
 		m.prevMode = m.mode
@@ -72,14 +109,14 @@ func (m Model) updateViewer(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 	case "]":
 		if m.tab == TabGit && m.gitState.ShowingDiff {
-			m.moveGitCursorDown()
+			m.moveGitDiffCursorDown()
 			m.loadDiffForFile(m.gitState.Cursor)
 			return m, nil
 		}
 
 	case "[":
 		if m.tab == TabGit && m.gitState.ShowingDiff {
-			m.moveGitCursorUp()
+			m.moveGitDiffCursorUp()
 			m.loadDiffForFile(m.gitState.Cursor)
 			return m, nil
 		}

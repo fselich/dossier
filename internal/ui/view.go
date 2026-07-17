@@ -220,10 +220,13 @@ func (m *Model) renderHelpBar() string {
 		tabRange = "1-5"
 	}
 	if m.tab == TabGit {
+		if m.gitState.ErrMsg != "" {
+			return errStyle.Render(m.gitState.ErrMsg)
+		}
 		if m.gitState.ShowingDiff {
 			return helpStyle.Render("d/Esc: back  [/]: prev/next  j/k: vertical  h/l: ←→ horizontal  q: quit")
 		}
-		return helpStyle.Render("h/l: change  " + tabRange + "/Tab: artifact  j/k: navigate  Enter/e: open file  d: view diff  Esc: index  q: quit")
+		return helpStyle.Render("h/l: change  " + tabRange + "/Tab: artifact  j/k: navigate  Enter/e: open file  d: view diff  s: stage/unstage  Esc: index  q: quit")
 	}
 	if m.tab == TabTasks {
 		return helpStyle.Render("h/l: change  " + tabRange + "/Tab: artifact  j/k: navigate  Space: toggle  e: edit  i: info  Esc: index  q: quit")

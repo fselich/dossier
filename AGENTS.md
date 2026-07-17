@@ -70,7 +70,7 @@ openspec/                   # OpenSpec project artifacts (not Go code)
 8. **`renderCache` cleared on three events**: change switch, window resize, mode switch. `editorReturnMsg` deletes only the current tab's cache.
 9. **`commitStateChange()`** adjusts viewport height and calls `loadViewport()` — used after every mode/tab/change change.
 10. **Git porcelain parsing**: uses `git status --porcelain=v1 -z -u`. Output is NUL-separated: each entry is `XY <path>\0` (3-byte header + path). Renames/copies: `R <old_path>\0<new_path>\0` — the entry token has the old path, the next NUL token has the new path (`Path` = new, `OldPath` = old). All git subprocess calls go through the exported `RunGit(dir, args...)` helper in `internal/git`, which enforces a 2s timeout via `context.WithTimeout` + `exec.CommandContext`. Files under `openspec/` are filtered out.
-11. **Git cursor skips deleted files**: `moveGitCursorDown/Up` wraps via modulo and skips `IsDeleted`. `clampGitCursor` scans forward then backward.
+11. **Git cursor no longer skips deleted files**: `moveGitCursorDown/Up` wraps via simple modulo (no `IsDeleted` skip). `clampGitCursor` is a simple clamp. Diff cycling (`[`/`]`) uses `moveGitDiffCursorDown/Up` which still skips deleted files. `s` key toggles stage/unstage on the file under cursor.
 12. **Git status poll is always-on**: `pollGitStatus()` runs every tick (guarded by `isGitRepo`), refreshes viewport only when `TabGit` is active.
 13. **Git tab label is dynamic**: `changes` when clean, `changes (N)` when files exist.
 14. **Archived change names**: `YYYY-MM-DD-name` format. `parseArchiveName` extracts first 10 chars as date (`DD/MM/YYYY`), rest as name. Non-matching names use full dir name as name with no date.

@@ -25,6 +25,23 @@ func RunGit(dir string, args ...string) ([]byte, error) {
 	return cmd.Output()
 }
 
+func Stage(root string, paths ...string) error {
+	args := append([]string{"add", "--"}, paths...)
+	_, err := RunGit(root, args...)
+	return err
+}
+
+func Unstage(root string, paths ...string) error {
+	args := append([]string{"reset", "-q", "HEAD", "--"}, paths...)
+	_, err := RunGit(root, args...)
+	if err != nil {
+		args2 := append([]string{"rm", "--cached", "-q", "--"}, paths...)
+		_, err2 := RunGit(root, args2...)
+		return err2
+	}
+	return nil
+}
+
 func IsInsideWorkTree(root string) bool {
 	out, err := RunGit(root, "rev-parse", "--is-inside-work-tree")
 	if err != nil {

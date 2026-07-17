@@ -2,12 +2,14 @@ package ui
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
+	"github.com/fselich/dossier/internal/git"
 	"github.com/fselich/dossier/internal/openspec"
 )
 
@@ -1136,4 +1138,459 @@ func TestRenderTabBar(t *testing.T) {
 			t.Error("expected proposal in tab bar")
 		}
 	})
+}
+
+func TestGitCursorLandsOnDeletedFiles(t *testing.T) {
+	t.Run("moveGitCursorDown lands on deleted file", func(t *testing.T) {
+		m := &Model{
+			gitState: gitState{
+				Files: []git.FileStatus{
+					{Path: "a.go", X: ' ', Y: 'M'},
+					{Path: "del.go", X: ' ', Y: 'D', IsDeleted: true},
+					{Path: "b.go", X: ' ', Y: 'M'},
+				},
+				Cursor: 0,
+			},
+		}
+		m.moveGitCursorDown()
+		if m.gitState.Cursor != 1 {
+			t.Errorf("expected cursor on deleted file (1), got %d", m.gitState.Cursor)
+		}
+	})
+
+	t.Run("moveGitCursorUp lands on deleted file", func(t *testing.T) {
+		m := &Model{
+			gitState: gitState{
+				Files: []git.FileStatus{
+					{Path: "a.go", X: ' ', Y: 'M'},
+					{Path: "del.go", X: ' ', Y: 'D', IsDeleted: true},
+					{Path: "b.go", X: ' ', Y: 'M'},
+				},
+				Cursor: 2,
+			},
+		}
+		m.moveGitCursorUp()
+		if m.gitState.Cursor != 1 {
+			t.Errorf("expected cursor on deleted file (1), got %d", m.gitState.Cursor)
+		}
+	})
+
+	t.Run("moveGitDiffCursorDown skips deleted files", func(t *testing.T) {
+		m := &Model{
+			gitState: gitState{
+				Files: []git.FileStatus{
+					{Path: "a.go", X: ' ', Y: 'M'},
+					{Path: "del.go", X: ' ', Y: 'D', IsDeleted: true},
+					{Path: "b.go", X: ' ', Y: 'M'},
+				},
+				Cursor: 0,
+			},
+		}
+		m.moveGitDiffCursorDown()
+		if m.gitState.Cursor != 2 {
+			t.Errorf("expected cursor to skip to b.go (2), got %d", m.gitState.Cursor)
+		}
+	})
+
+	t.Run("moveGitDiffCursorUp skips deleted files", func(t *testing.T) {
+		m := &Model{
+			gitState: gitState{
+				Files: []git.FileStatus{
+					{Path: "a.go", X: ' ', Y: 'M'},
+					{Path: "del.go", X: ' ', Y: 'D', IsDeleted: true},
+					{Path: "b.go", X: ' ', Y: 'M'},
+				},
+				Cursor: 2,
+			},
+		}
+		m.moveGitDiffCursorUp()
+		if m.gitState.Cursor != 0 {
+			t.Errorf("expected cursor to skip to a.go (0), got %d", m.gitState.Cursor)
+		}
+	})
+}
+
+func TestGitDeletedEnterEDNoop(t *testing.T) {
+	t.Run("d on deleted file does nothing", func(t *testing.T) {
+		m := Model{
+			mode: ModeNormal,
+			tab:  TabGit,
+			gitState: gitState{
+				Files: []git.FileStatus{
+					{Path: "del.go", X: ' ', Y: 'D', IsDeleted: true},
+				},
+				Cursor: 0,
+			},
+			width: 80, height: 24,
+		}
+		m.vp = viewport.New(viewport.WithWidth(80), viewport.WithHeight(20))
+		m.vpReady = true
+		result, _ := m.dispatchKey(tea.KeyPressMsg{Text: "d"})
+		updated := result.(Model)
+		if updated.gitState.ShowingDiff {
+			t.Error("expected diff not to show for deleted file")
+		}
+	})
+
+	t.Run("Enter on deleted file does nothing", func(t *testing.T) {
+		m := Model{
+			mode: ModeNormal,
+			tab:  TabGit,
+			gitState: gitState{
+				Files: []git.FileStatus{
+					{Path: "del.go", X: ' ', Y: 'D', IsDeleted: true},
+				},
+				Cursor: 0,
+			},
+			width: 80, height: 24,
+		}
+		m.vp = viewport.New(viewport.WithWidth(80), viewport.WithHeight(20))
+		m.vpReady = true
+		result, _ := m.dispatchKey(tea.KeyPressMsg{Code: tea.KeyEnter})
+		updated := result.(Model)
+		if updated.gitState.ShowingDiff {
+			t.Error("expected diff not to show for deleted file")
+		}
+	})
+
+	t.Run("e on deleted file does nothing", func(t *testing.T) {
+		m := Model{
+			mode: ModeNormal,
+			tab:  TabGit,
+			gitState: gitState{
+				Files: []git.FileStatus{
+					{Path: "del.go", X: ' ', Y: 'D', IsDeleted: true},
+				},
+				Cursor: 0,
+			},
+			width: 80, height: 24,
+		}
+		m.vp = viewport.New(viewport.WithWidth(80), viewport.WithHeight(20))
+		m.vpReady = true
+		result, _ := m.dispatchKey(tea.KeyPressMsg{Text: "e"})
+		updated := result.(Model)
+		if updated.gitState.ShowingDiff {
+			t.Error("expected diff not to show for deleted file")
+		}
+	})
+}
+
+// ── git tab s toggle tests ─────────────────────────────────────────────────────
+
+func skipIfNoGit(t *testing.T) {
+	t.Helper()
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not found on PATH")
+	}
+}
+
+func gitInit(t *testing.T, dir string) {
+	t.Helper()
+	mustGit(t, dir, "init")
+	mustGit(t, dir, "config", "user.email", "test@test")
+	mustGit(t, dir, "config", "user.name", "Test")
+}
+
+func mustGit(t *testing.T, dir string, args ...string) string {
+	t.Helper()
+	cmd := exec.Command("git", append([]string{"-C", dir}, args...)...)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("git %v: %v\n%s", args, err, out)
+	}
+	return string(out)
+}
+
+func TestGitSStageModified(t *testing.T) {
+	skipIfNoGit(t)
+	dir := t.TempDir()
+	gitInit(t, dir)
+	mustGit(t, dir, "commit", "--allow-empty", "-m", "init")
+	if err := os.WriteFile(filepath.Join(dir, "a.txt"), []byte("v1"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	mustGit(t, dir, "add", "a.txt")
+	mustGit(t, dir, "commit", "-m", "add a")
+	if err := os.WriteFile(filepath.Join(dir, "a.txt"), []byte("v2"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	files, err := git.Status(dir)
+	if err != nil {
+		t.Fatalf("Status: %v", err)
+	}
+
+	m := Model{
+		mode:      ModeNormal,
+		tab:       TabGit,
+		root:      dir,
+		gitRoot:   dir,
+		isGitRepo: true,
+		gitState: gitState{
+			Files:  files,
+			Cursor: 0,
+		},
+		width: 80, height: 24,
+	}
+	m.vp = viewport.New(viewport.WithWidth(80), viewport.WithHeight(20))
+	m.vpReady = true
+
+	result, _ := m.dispatchKey(tea.KeyPressMsg{Text: "s"})
+	updated := result.(Model)
+	if updated.gitState.ErrMsg != "" {
+		t.Fatalf("unexpected error: %s", updated.gitState.ErrMsg)
+	}
+	if len(updated.gitState.Files) == 0 {
+		t.Fatal("expected files after stage")
+	}
+	f := updated.gitState.Files[0]
+	if f.X != 'M' || f.Y != ' ' {
+		t.Errorf("expected staged (M ), got %c%c", f.X, f.Y)
+	}
+}
+
+func TestGitSUnstageStaged(t *testing.T) {
+	skipIfNoGit(t)
+	dir := t.TempDir()
+	gitInit(t, dir)
+	mustGit(t, dir, "commit", "--allow-empty", "-m", "init")
+	if err := os.WriteFile(filepath.Join(dir, "a.txt"), []byte("v1"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	mustGit(t, dir, "add", "a.txt")
+	mustGit(t, dir, "commit", "-m", "add a")
+	if err := os.WriteFile(filepath.Join(dir, "a.txt"), []byte("v2"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	mustGit(t, dir, "add", "a.txt")
+
+	files, err := git.Status(dir)
+	if err != nil {
+		t.Fatalf("Status: %v", err)
+	}
+
+	m := Model{
+		mode:      ModeNormal,
+		tab:       TabGit,
+		root:      dir,
+		gitRoot:   dir,
+		isGitRepo: true,
+		gitState: gitState{
+			Files:  files,
+			Cursor: 0,
+		},
+		width: 80, height: 24,
+	}
+	m.vp = viewport.New(viewport.WithWidth(80), viewport.WithHeight(20))
+	m.vpReady = true
+
+	result, _ := m.dispatchKey(tea.KeyPressMsg{Text: "s"})
+	updated := result.(Model)
+	if updated.gitState.ErrMsg != "" {
+		t.Fatalf("unexpected error: %s", updated.gitState.ErrMsg)
+	}
+	if len(updated.gitState.Files) == 0 {
+		t.Fatal("expected files after unstage")
+	}
+	f := updated.gitState.Files[0]
+	if f.X != ' ' || f.Y != 'M' {
+		t.Errorf("expected unstaged ( M), got %c%c", f.X, f.Y)
+	}
+}
+
+func TestGitSMixedMM(t *testing.T) {
+	skipIfNoGit(t)
+	dir := t.TempDir()
+	gitInit(t, dir)
+	mustGit(t, dir, "commit", "--allow-empty", "-m", "init")
+	if err := os.WriteFile(filepath.Join(dir, "a.txt"), []byte("v1"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	mustGit(t, dir, "add", "a.txt")
+	mustGit(t, dir, "commit", "-m", "add a")
+	if err := os.WriteFile(filepath.Join(dir, "a.txt"), []byte("v2"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	mustGit(t, dir, "add", "a.txt")
+	if err := os.WriteFile(filepath.Join(dir, "a.txt"), []byte("v3"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	files, err := git.Status(dir)
+	if err != nil {
+		t.Fatalf("Status: %v", err)
+	}
+	if len(files) == 0 || files[0].X != 'M' || files[0].Y != 'M' {
+		t.Fatalf("expected MM, got %+v", files)
+	}
+
+	m := Model{
+		mode:      ModeNormal,
+		tab:       TabGit,
+		root:      dir,
+		gitRoot:   dir,
+		isGitRepo: true,
+		gitState: gitState{
+			Files:  files,
+			Cursor: 0,
+		},
+		width: 80, height: 24,
+	}
+	m.vp = viewport.New(viewport.WithWidth(80), viewport.WithHeight(20))
+	m.vpReady = true
+
+	result, _ := m.dispatchKey(tea.KeyPressMsg{Text: "s"})
+	updated := result.(Model)
+	if updated.gitState.ErrMsg != "" {
+		t.Fatalf("unexpected error: %s", updated.gitState.ErrMsg)
+	}
+	if len(updated.gitState.Files) == 0 {
+		t.Fatal("expected files after stage")
+	}
+	f := updated.gitState.Files[0]
+	if f.X != 'M' || f.Y != ' ' {
+		t.Errorf("expected `M ` after staging MM (worktree side), got %c%c", f.X, f.Y)
+	}
+}
+
+func TestGitSStageDeleted(t *testing.T) {
+	skipIfNoGit(t)
+	dir := t.TempDir()
+	gitInit(t, dir)
+	mustGit(t, dir, "commit", "--allow-empty", "-m", "init")
+	if err := os.WriteFile(filepath.Join(dir, "del.txt"), []byte("bye"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	mustGit(t, dir, "add", "del.txt")
+	mustGit(t, dir, "commit", "-m", "add del")
+	if err := os.Remove(filepath.Join(dir, "del.txt")); err != nil {
+		t.Fatal(err)
+	}
+
+	files, err := git.Status(dir)
+	if err != nil {
+		t.Fatalf("Status: %v", err)
+	}
+
+	m := Model{
+		mode:      ModeNormal,
+		tab:       TabGit,
+		root:      dir,
+		gitRoot:   dir,
+		isGitRepo: true,
+		gitState: gitState{
+			Files:  files,
+			Cursor: 0,
+		},
+		width: 80, height: 24,
+	}
+	m.vp = viewport.New(viewport.WithWidth(80), viewport.WithHeight(20))
+	m.vpReady = true
+
+	result, _ := m.dispatchKey(tea.KeyPressMsg{Text: "s"})
+	updated := result.(Model)
+	if updated.gitState.ErrMsg != "" {
+		t.Fatalf("unexpected error: %s", updated.gitState.ErrMsg)
+	}
+	if len(updated.gitState.Files) == 0 {
+		t.Fatal("expected files after stage")
+	}
+	f := updated.gitState.Files[0]
+	if f.X != 'D' || f.Y != ' ' {
+		t.Errorf("expected staged delete (D ), got %c%c", f.X, f.Y)
+	}
+}
+
+func TestGitSErrorPath(t *testing.T) {
+	skipIfNoGit(t)
+	dir := t.TempDir()
+	gitInit(t, dir)
+	mustGit(t, dir, "commit", "--allow-empty", "-m", "init")
+	if err := os.WriteFile(filepath.Join(dir, "a.txt"), []byte("v1"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	mustGit(t, dir, "add", "a.txt")
+	mustGit(t, dir, "commit", "-m", "add a")
+	if err := os.WriteFile(filepath.Join(dir, "a.txt"), []byte("v2"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	gitDir := filepath.Join(dir, ".git")
+	lockFile := filepath.Join(gitDir, "index.lock")
+	if err := os.WriteFile(lockFile, []byte("lock"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Remove(lockFile) })
+
+	files, err := git.Status(dir)
+	if err != nil {
+		t.Fatalf("Status: %v", err)
+	}
+
+	m := Model{
+		mode:      ModeNormal,
+		tab:       TabGit,
+		root:      dir,
+		gitRoot:   dir,
+		isGitRepo: true,
+		gitState: gitState{
+			Files:  files,
+			Cursor: 0,
+		},
+		width: 80, height: 24,
+	}
+	m.vp = viewport.New(viewport.WithWidth(80), viewport.WithHeight(20))
+	m.vpReady = true
+
+	result, _ := m.dispatchKey(tea.KeyPressMsg{Text: "s"})
+	updated := result.(Model)
+	if updated.gitState.ErrMsg == "" {
+		t.Fatal("expected error message when index.lock is held")
+	}
+}
+
+func TestGitSInactiveInDiffView(t *testing.T) {
+	m := Model{
+		mode: ModeNormal,
+		tab:  TabGit,
+		gitState: gitState{
+			Files: []git.FileStatus{
+				{Path: "a.txt", X: ' ', Y: 'M'},
+			},
+			ShowingDiff: true,
+			Cursor:      0,
+		},
+		isGitRepo: true,
+		width:     80, height: 24,
+	}
+	m.vp = viewport.New(viewport.WithWidth(80), viewport.WithHeight(20))
+	m.vpReady = true
+
+	beforeFiles := len(m.gitState.Files)
+	result, _ := m.dispatchKey(tea.KeyPressMsg{Text: "s"})
+	updated := result.(Model)
+	if len(updated.gitState.Files) != beforeFiles {
+		t.Error("expected s to be a no-op in diff view")
+	}
+}
+
+func TestGitSInactiveCleanTree(t *testing.T) {
+	m := Model{
+		mode: ModeNormal,
+		tab:  TabGit,
+		gitState: gitState{
+			Files:  nil,
+			Cursor: 0,
+		},
+		isGitRepo: true,
+		width:     80, height: 24,
+	}
+	m.vp = viewport.New(viewport.WithWidth(80), viewport.WithHeight(20))
+	m.vpReady = true
+
+	result, _ := m.dispatchKey(tea.KeyPressMsg{Text: "s"})
+	updated := result.(Model)
+	if updated.gitState.Files != nil {
+		t.Error("expected s to be a no-op on clean tree")
+	}
 }

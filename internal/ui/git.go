@@ -19,6 +19,8 @@ func (m *Model) pollGitStatus() {
 		return
 	}
 
+	m.gitState.ErrMsg = ""
+
 	preserveDiff := m.gitState.ShowingDiff && m.gitState.DiffFile != "" &&
 		diffViewPreservable(m.gitState.DiffFile, files, m.gitState.Files)
 
@@ -83,22 +85,26 @@ func clampGitCursor(cursor int, files []git.FileStatus) int {
 	if cursor >= len(files) {
 		return len(files) - 1
 	}
-	if files[cursor].IsDeleted {
-		for i := cursor; i < len(files); i++ {
-			if !files[i].IsDeleted {
-				return i
-			}
-		}
-		for i := cursor; i >= 0; i-- {
-			if !files[i].IsDeleted {
-				return i
-			}
-		}
-	}
 	return cursor
 }
 
 func (m *Model) moveGitCursorDown() {
+	n := len(m.gitState.Files)
+	if n == 0 {
+		return
+	}
+	m.gitState.Cursor = (m.gitState.Cursor + 1) % n
+}
+
+func (m *Model) moveGitCursorUp() {
+	n := len(m.gitState.Files)
+	if n == 0 {
+		return
+	}
+	m.gitState.Cursor = (m.gitState.Cursor - 1 + n) % n
+}
+
+func (m *Model) moveGitDiffCursorDown() {
 	n := len(m.gitState.Files)
 	if n == 0 {
 		return
@@ -115,7 +121,7 @@ func (m *Model) moveGitCursorDown() {
 	}
 }
 
-func (m *Model) moveGitCursorUp() {
+func (m *Model) moveGitDiffCursorUp() {
 	n := len(m.gitState.Files)
 	if n == 0 {
 		return
@@ -129,6 +135,18 @@ func (m *Model) moveGitCursorUp() {
 		if m.gitState.Cursor == start {
 			return
 		}
+	}
+}
+
+func (m *Model) restoreGitCursor(path string) {
+	for i, f := range m.gitState.Files {
+		if f.Path == path {
+			m.gitState.Cursor = i
+			return
+		}
+	}
+	if m.gitState.Cursor >= len(m.gitState.Files) {
+		m.gitState.Cursor = 0
 	}
 }
 
