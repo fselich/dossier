@@ -528,6 +528,54 @@ func TestUpdateKeyPresses(t *testing.T) {
 			t.Errorf("expected cursor 0, got %d", updated.index.Cursor)
 		}
 	})
+
+	t.Run("pgdown scrolls a full page in proposal tab", func(t *testing.T) {
+		m := Model{
+			mode: ModeNormal,
+			tab:  TabProposal,
+		}
+		m.vp = viewport.New(viewport.WithWidth(80), viewport.WithHeight(10))
+		m.vp.SetContent(strings.Repeat("line\n", 100))
+		msg := tea.KeyPressMsg{Code: tea.KeyPgDown}
+		result, _ := m.dispatchKey(msg)
+		updated := result.(Model)
+		if updated.vp.YOffset() <= 1 {
+			t.Errorf("expected pgdown to scroll a full page, got offset %d", updated.vp.YOffset())
+		}
+	})
+
+	t.Run("pgup scrolls a full page back up", func(t *testing.T) {
+		m := Model{
+			mode: ModeNormal,
+			tab:  TabProposal,
+		}
+		m.vp = viewport.New(viewport.WithWidth(80), viewport.WithHeight(10))
+		m.vp.SetContent(strings.Repeat("line\n", 100))
+		m.vp.PageDown()
+		m.vp.PageDown()
+		offsetBefore := m.vp.YOffset()
+		msg := tea.KeyPressMsg{Code: tea.KeyPgUp}
+		result, _ := m.dispatchKey(msg)
+		updated := result.(Model)
+		if updated.vp.YOffset() >= offsetBefore {
+			t.Errorf("expected pgup to scroll back, offset before %d, after %d", offsetBefore, updated.vp.YOffset())
+		}
+	})
+
+	t.Run("pgdown is a no-op on task list", func(t *testing.T) {
+		m := Model{
+			mode: ModeNormal,
+			tab:  TabTasks,
+		}
+		m.vp = viewport.New(viewport.WithWidth(80), viewport.WithHeight(10))
+		m.vp.SetContent(strings.Repeat("line\n", 100))
+		msg := tea.KeyPressMsg{Code: tea.KeyPgDown}
+		result, _ := m.dispatchKey(msg)
+		updated := result.(Model)
+		if updated.vp.YOffset() != 0 {
+			t.Errorf("expected task tab pgdown to be a no-op, got offset %d", updated.vp.YOffset())
+		}
+	})
 }
 
 func TestMoveCursorOnSections(t *testing.T) {
