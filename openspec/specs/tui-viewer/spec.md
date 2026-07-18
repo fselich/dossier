@@ -100,11 +100,15 @@ The TUI SHALL show a tab bar with tabs `proposal`, `design`, `tasks`, `specs`. T
 - **THEN** the tab does not change and the key is handled by the text input instead
 
 ### Requirement: Render de markdown con glamour
-The TUI SHALL render `proposal`, `design`, and `specs` artifacts using glamour with the width of the content area. The content area SHALL be scrollable with `j`/`k` or the arrow keys.
+The TUI SHALL render `proposal`, `design`, and `specs` artifacts using glamour with the width of the content area. The content area SHALL be scrollable with `j`/`k`, the arrow keys, or `PgDown`/`PgUp`.
 
-#### Scenario: Scroll en contenido largo
+#### Scenario: Scroll línea a línea
 - **WHEN** the artifact has more content than the screen height and the user presses `j`
 - **THEN** the content scrolls down one line
+
+#### Scenario: Scroll por página completa
+- **WHEN** the artifact has more content than the screen height and the user presses `PgDown`
+- **THEN** the content scrolls down by a full viewport height
 
 #### Scenario: Wrap de glamour ajustado al ancho
 - **WHEN** the terminal is 80 columns wide

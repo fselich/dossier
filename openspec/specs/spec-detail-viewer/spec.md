@@ -14,7 +14,11 @@ The TUI SHALL implement a `ModeViewingSpec` mode that displays the content of `o
 
 #### Scenario: Scroll del contenido
 - **WHEN** the mode is `ModeViewingSpec` and the user presses `j` or `k`
-- **THEN** the viewport scrolls down or up respectively
+- **THEN** the viewport scrolls down or up one line respectively
+
+#### Scenario: Scroll por página completa
+- **WHEN** the mode is `ModeViewingSpec` and the user presses `PgDown` or `PgUp`
+- **THEN** the viewport scrolls down or up by a full viewport height respectively
 
 #### Scenario: Volver al índice
 - **WHEN** the mode is `ModeViewingSpec` and the user presses `Esc`
