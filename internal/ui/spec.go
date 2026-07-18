@@ -40,6 +40,12 @@ func (m Model) updateSpec(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "k", "up":
 		m.vp.ScrollUp(1)
 
+	case "pgdown":
+		m.vp.PageDown()
+
+	case "pgup":
+		m.vp.PageUp()
+
 	case "h":
 		if m.specViewer.FocusMode {
 			ps := m.projectSpecs[m.specViewer.Cursor]

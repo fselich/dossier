@@ -14,6 +14,12 @@ func (m Model) updateConfig(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 	case "k", "up":
 		m.vp.ScrollUp(1)
+
+	case "pgdown":
+		m.vp.PageDown()
+
+	case "pgup":
+		m.vp.PageUp()
 	}
 	return m, nil
 }
