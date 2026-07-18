@@ -2,6 +2,11 @@
 
 # Changelog
 
+## v0.19.0
+
+### Added
+- `PgDown` and `PgUp` now scroll documents by a full page at a time — in artifacts, spec viewer, and the config view. Thanks [arnd-s](https://github.com/arnd-s) for the contribution!
+
 ## v0.18.0
 
 ### Added

@@ -2,6 +2,11 @@
 
 # Changelog
 
+## v0.19.0
+
+### Añadido
+- `PgDown` y `PgUp` ahora desplazan los documentos una página completa de una sola vez — en artefactos, el visor de specs y la vista de configuración. ¡Gracias [arnd-s](https://github.com/arnd-s) por la contribución!
+
 ## v0.18.0
 
 ### Añadido
