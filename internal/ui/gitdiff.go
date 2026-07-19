@@ -175,9 +175,9 @@ func fmtLineNum(n int) string {
 
 const lineNumWidth = 4
 
-func renderDiff(lines []DiffLine, filename string, width int, scrollX int, chromaStyleName string, addBgColor, removeBgColor string) string {
+func (m *Model) renderDiff(lines []DiffLine, filename string, width int, scrollX int, chromaStyleName string, addBgColor, removeBgColor string) string {
 	if len(lines) == 0 {
-		return helpStyle.Render("  (no diff available)")
+		return m.theme.Styles.Help.Render("  (no diff available)")
 	}
 	codeWidth := width - 1 - lineNumWidth*2 - 3
 	if codeWidth < 10 {
@@ -187,13 +187,13 @@ func renderDiff(lines []DiffLine, filename string, width int, scrollX int, chrom
 	for _, dl := range lines {
 		switch dl.Type {
 		case LineHunkHeader:
-			sb.WriteString(" " + gitStatusRenamed.Render("    ···  "+dl.Content) + "\n")
+			sb.WriteString(" " + m.theme.Styles.GitRenamed.Render("    ···  "+dl.Content) + "\n")
 		case LineAdded:
 			oldNum := fmtLineNum(dl.OldNum)
 			newNum := fmtLineNum(dl.NewNum)
-			nums := gitStatusAdded.Render(oldNum + " " + newNum)
+			nums := m.theme.Styles.GitAdded.Render(oldNum + " " + newNum)
 			content := scrollContent(dl.Content, scrollX)
-			indicator := gitStatusAdded.Render("+ ")
+			indicator := m.theme.Styles.GitAdded.Render("+ ")
 			highlighted := highlightLine(content, filename, addBgColor, chromaStyleName)
 			line := nums + " " + indicator + highlighted
 			line = padLine(line, codeWidth+lineNumWidth*2+3, addBgColor)
@@ -201,9 +201,9 @@ func renderDiff(lines []DiffLine, filename string, width int, scrollX int, chrom
 		case LineRemoved:
 			oldNum := fmtLineNum(dl.OldNum)
 			newNum := fmtLineNum(dl.NewNum)
-			nums := diffRemoved.Render(oldNum + " " + newNum)
+			nums := m.theme.Styles.DiffRemoved.Render(oldNum + " " + newNum)
 			content := scrollContent(dl.Content, scrollX)
-			indicator := diffRemoved.Render("- ")
+			indicator := m.theme.Styles.DiffRemoved.Render("- ")
 			highlighted := highlightLine(content, filename, removeBgColor, chromaStyleName)
 			line := nums + " " + indicator + highlighted
 			line = padLine(line, codeWidth+lineNumWidth*2+3, removeBgColor)
@@ -211,7 +211,7 @@ func renderDiff(lines []DiffLine, filename string, width int, scrollX int, chrom
 		case LineContext:
 			oldNum := fmtLineNum(dl.OldNum)
 			newNum := fmtLineNum(dl.NewNum)
-			nums := helpStyle.Render(oldNum + " " + newNum)
+			nums := m.theme.Styles.Help.Render(oldNum + " " + newNum)
 			content := scrollContent(dl.Content, scrollX)
 			highlighted := highlightLine(content, filename, "", chromaStyleName)
 			line := nums + "  " + highlighted

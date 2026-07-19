@@ -160,21 +160,21 @@ func (m *Model) refreshGitViewport() {
 	}
 }
 
-func gitFileColorStyle(x, y byte, isDeleted bool) lipgloss.Style {
+func (m *Model) gitFileColorStyle(x, y byte, isDeleted bool) lipgloss.Style {
 	if isDeleted {
-		return gitStatusDeleted
+		return m.theme.Styles.GitDeleted
 	}
 	switch {
 	case x == '?' && y == '?':
-		return gitStatusUntracked
+		return m.theme.Styles.GitUntracked
 	case x == 'A' || y == 'A':
-		return gitStatusAdded
+		return m.theme.Styles.GitAdded
 	case x == 'R' || y == 'R', x == 'C' || y == 'C':
-		return gitStatusRenamed
+		return m.theme.Styles.GitRenamed
 	case x == 'D' || y == 'D':
-		return gitStatusDeleted
+		return m.theme.Styles.GitDeleted
 	default:
-		return gitStatusModified
+		return m.theme.Styles.GitModified
 	}
 }
 
@@ -191,7 +191,7 @@ func (m *Model) renderGitContent() (string, int) {
 	line++
 
 	if len(m.gitState.Files) == 0 {
-		sb.WriteString("  " + helpStyle.Render("(working tree clean)") + "\n")
+		sb.WriteString("  " + m.theme.Styles.Help.Render("(working tree clean)") + "\n")
 		return sb.String(), cursorLine
 	}
 
@@ -203,16 +203,16 @@ func (m *Model) renderGitContent() (string, int) {
 
 		cursorMark := "  "
 		if cursor {
-			cursorMark = taskCursorMarkStyle.Render("▶") + " "
+			cursorMark = m.theme.Styles.TaskCursorMark.Render("▶") + " "
 		}
 
-		statusStyle := gitFileColorStyle(f.X, f.Y, f.IsDeleted)
+		statusStyle := m.gitFileColorStyle(f.X, f.Y, f.IsDeleted)
 
-		xPart := gitStatusDot.Render("·")
+		xPart := m.theme.Styles.GitDot.Render("·")
 		if f.X > ' ' {
 			xPart = statusStyle.Render(string(f.X))
 		}
-		yPart := gitStatusDot.Render("·")
+		yPart := m.theme.Styles.GitDot.Render("·")
 		if f.Y > ' ' {
 			yPart = statusStyle.Render(string(f.Y))
 		}
@@ -220,9 +220,9 @@ func (m *Model) renderGitContent() (string, int) {
 
 		var pathStr string
 		if f.OldPath != "" {
-			pathStr = helpStyle.Render(f.OldPath+" → ") + statusStyle.Render(f.Path)
+			pathStr = m.theme.Styles.Help.Render(f.OldPath+" → ") + statusStyle.Render(f.Path)
 		} else if f.IsDeleted {
-			pathStr = gitStatusDeleted.Render(f.Path)
+			pathStr = m.theme.Styles.GitDeleted.Render(f.Path)
 		} else {
 			pathStr = statusStyle.Render(f.Path)
 		}
@@ -239,7 +239,7 @@ func (m *Model) renderDiffContent() (string, int) {
 	var sb strings.Builder
 	header := m.gitState.DiffFile
 	sb.WriteString("\n")
-	sb.WriteString("  " + sectionStyle.Render("diff: "+header) + "\n")
+	sb.WriteString("  " + m.theme.Styles.Section.Render("diff: "+header) + "\n")
 	sb.WriteString("\n")
 	if m.gitState.DiffLines == nil {
 		sb.WriteString("  (no diff available)\n")
@@ -256,7 +256,7 @@ func (m *Model) renderDiffContent() (string, int) {
 		if removeBg == "" {
 			removeBg = "#3a1a1a"
 		}
-		content := renderDiff(m.gitState.DiffLines, header, m.width-2, m.gitState.ScrollX, cs, addBg, removeBg)
+		content := m.renderDiff(m.gitState.DiffLines, header, m.width-2, m.gitState.ScrollX, cs, addBg, removeBg)
 		sb.WriteString(content)
 	}
 	return sb.String(), 0

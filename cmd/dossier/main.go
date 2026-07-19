@@ -19,7 +19,7 @@ func main() {
 		model   ui.Model
 	)
 
-	themeName := flag.String("theme", "dark", "Visual theme (dark, light, dracula)")
+	themeName := flag.String("theme", "none", "Visual theme (dark, none, light, dracula)")
 	showVersion := flag.Bool("version", false, "Print version and exit")
 	showHelp := flag.Bool("help", false, "Print help and exit")
 

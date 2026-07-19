@@ -1,6 +1,10 @@
 package ui
 
-import "testing"
+import (
+	"testing"
+
+	"charm.land/lipgloss/v2"
+)
 
 func TestBuiltinThemesExist(t *testing.T) {
 	names := []string{"dark", "light", "dracula"}
@@ -36,10 +40,13 @@ func TestLookupThemeNotFound(t *testing.T) {
 	}
 }
 
-func TestDefaultThemeIsDark(t *testing.T) {
+func TestDefaultThemeIsNone(t *testing.T) {
 	dt := DefaultTheme()
-	if dt.Name != "dark" {
-		t.Errorf("DefaultTheme().Name = %q, want %q", dt.Name, "dark")
+	if dt.Name != "none" {
+		t.Errorf("DefaultTheme().Name = %q, want %q", dt.Name, "none")
+	}
+	if dt.ViewBg != nil {
+		t.Error("DefaultTheme should have nil ViewBg (respect terminal default)")
 	}
 }
 
@@ -71,5 +78,81 @@ func TestDraculaThemeConfig(t *testing.T) {
 	}
 	if DraculaTheme.ChromaStyle != "dracula" {
 		t.Errorf("DraculaTheme.ChromaStyle = %q, want %q", DraculaTheme.ChromaStyle, "dracula")
+	}
+}
+
+func TestBuildStylesProducesStyles(t *testing.T) {
+	styles := BuildStyles(DarkColors)
+	if styles.BaseText.GetForeground() == nil {
+		t.Error("BaseText should have foreground set")
+	}
+	if styles.Header.GetForeground() == nil {
+		t.Error("Header should have foreground set")
+	}
+	if styles.Section.GetForeground() == nil {
+		t.Error("Section should have foreground set")
+	}
+	if styles.Help.GetForeground() == nil {
+		t.Error("Help should have foreground set")
+	}
+}
+
+func TestBuildStylesUsesCorrectColors(t *testing.T) {
+	styles := BuildStyles(DarkColors)
+	if styles.BaseText.GetForeground() != DarkColors.PrimaryFg {
+		t.Error("BaseText should use PrimaryFg")
+	}
+	if styles.Header.GetForeground() != DarkColors.AccentBlue {
+		t.Error("Header should use AccentBlue")
+	}
+	if styles.Section.GetForeground() != DarkColors.AccentYellow {
+		t.Error("Section should use AccentYellow")
+	}
+	if styles.Error.GetForeground() != DarkColors.AccentRed {
+		t.Error("Error should use AccentRed")
+	}
+}
+
+func TestDarkColorsPreserveOriginalValues(t *testing.T) {
+	colors := DarkColors
+	checkStr := func(name string, got, want any) {
+		if got != want {
+			t.Errorf("DarkColors.%s: got %v, want %v", name, got, want)
+		}
+	}
+	checkStr("PrimaryFg", colors.PrimaryFg, lipgloss.Color("15"))
+	checkStr("MutedFg", colors.MutedFg, lipgloss.Color("8"))
+	checkStr("AccentBlue", colors.AccentBlue, lipgloss.Color("12"))
+	checkStr("AccentYellow", colors.AccentYellow, lipgloss.Color("11"))
+	checkStr("AccentGreen", colors.AccentGreen, lipgloss.Color("2"))
+	checkStr("AccentRed", colors.AccentRed, lipgloss.Color("9"))
+}
+
+func TestLightColorsAdaptedForWhiteBackground(t *testing.T) {
+	colors := LightColors
+	checkStr := func(name string, got, want any) {
+		if got != want {
+			t.Errorf("LightColors.%s: got %v, want %v", name, got, want)
+		}
+	}
+	checkStr("PrimaryFg", colors.PrimaryFg, lipgloss.Color("0"))
+	checkStr("AccentYellow", colors.AccentYellow, lipgloss.Color("3"))
+	checkStr("AccentRed", colors.AccentRed, lipgloss.Color("1"))
+	checkStr("MutedFg", colors.MutedFg, lipgloss.Color("7"))
+	checkStr("MidFg", colors.MidFg, lipgloss.Color("8"))
+}
+
+func TestNoneThemeInheritsDarkColors(t *testing.T) {
+	if NoneTheme.Colors != DarkColors {
+		t.Error("NoneTheme should use DarkColors")
+	}
+}
+
+func TestDraculaUsesDarkerYellow(t *testing.T) {
+	if DraculaColors.AccentYellow != lipgloss.Color("3") {
+		t.Errorf("DraculaColors.AccentYellow = %v, want Color(\"3\")", DraculaColors.AccentYellow)
+	}
+	if DraculaColors.AccentYellow == DarkColors.AccentYellow {
+		t.Error("Dracula AccentYellow should differ from Dark")
 	}
 }
