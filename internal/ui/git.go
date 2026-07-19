@@ -244,7 +244,19 @@ func (m *Model) renderDiffContent() (string, int) {
 	if m.gitState.DiffLines == nil {
 		sb.WriteString("  (no diff available)\n")
 	} else {
-		content := renderDiff(m.gitState.DiffLines, header, m.width-2, m.gitState.ScrollX)
+		cs := m.theme.ChromaStyle
+		if cs == "" {
+			cs = "monokai"
+		}
+		addBg := m.theme.DiffAddBg
+		if addBg == "" {
+			addBg = "#1a3a1a"
+		}
+		removeBg := m.theme.DiffRemoveBg
+		if removeBg == "" {
+			removeBg = "#3a1a1a"
+		}
+		content := renderDiff(m.gitState.DiffLines, header, m.width-2, m.gitState.ScrollX, cs, addBg, removeBg)
 		sb.WriteString(content)
 	}
 	return sb.String(), 0

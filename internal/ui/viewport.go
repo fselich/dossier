@@ -33,11 +33,16 @@ func (m *Model) ensureRenderer(width int) {
 	if m.glamourRenderer != nil && m.lastRenderWidth == width {
 		return
 	}
+	style := m.theme.GlamourStyle
+	if style == "" {
+		style = "dark"
+	}
 	r, err := glamour.NewTermRenderer(
-		glamour.WithStandardStyle("dark"),
+		glamour.WithStandardStyle(style),
 		glamour.WithWordWrap(width),
 	)
 	if err != nil {
+		m.glamourRenderer = nil
 		return
 	}
 	m.glamourRenderer = r
@@ -59,6 +64,11 @@ func (m *Model) loadViewportForConfig() tea.Cmd {
 	m.vp.SetContent(raw)
 	width := m.renderWidth()
 	m.ensureRenderer(width)
+	if m.glamourRenderer == nil {
+		return func() tea.Msg {
+			return renderedConfigMsg{content: raw}
+		}
+	}
 	return func() tea.Msg {
 		out, err := m.glamourRenderer.Render(raw)
 		if err != nil {
@@ -82,6 +92,11 @@ func (m *Model) loadViewportForSpec() tea.Cmd {
 	m.vp.SetContent(raw)
 	width := m.renderWidth()
 	m.ensureRenderer(width)
+	if m.glamourRenderer == nil {
+		return func() tea.Msg {
+			return specRenderedMsg{content: raw}
+		}
+	}
 
 	if m.specViewer.FocusMode {
 		jumpTarget := m.specViewer.JumpTarget
@@ -163,6 +178,11 @@ func (m *Model) loadViewportForArtifact() tea.Cmd {
 	tab := m.tab
 	width := m.renderWidth()
 	m.ensureRenderer(width)
+	if m.glamourRenderer == nil {
+		return func() tea.Msg {
+			return renderedMsg{tab: tab, content: raw}
+		}
+	}
 	return func() tea.Msg {
 		out, err := m.glamourRenderer.Render(raw)
 		if err != nil {

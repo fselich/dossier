@@ -1,7 +1,6 @@
 package ui
 
 import (
-	"image/color"
 	"os"
 	"path/filepath"
 	"time"
@@ -124,10 +123,6 @@ type indexItem struct {
 	reqIdx int // index into projectSpecs[idx].RequirementNames; only used for indexKindRequirement
 }
 
-type Theme struct {
-	ViewBg color.Color
-}
-
 type Model struct {
 	root   string
 	loader *openspec.Loader
@@ -166,14 +161,14 @@ type Model struct {
 	theme         Theme
 }
 
-func New(project *openspec.Project, cfg openspec.ProjectConfig, root string, loader *openspec.Loader) Model {
+func New(project *openspec.Project, cfg openspec.ProjectConfig, root string, loader *openspec.Loader, theme Theme) Model {
 	m := Model{
 		root:          root,
 		loader:        loader,
 		project:       project,
 		renderCache:   make(map[Tab]string),
 		projectConfig: cfg,
-		theme:         Theme{},
+		theme:         theme,
 		isGitRepo:     git.IsInsideWorkTree(root),
 	}
 	if m.isGitRepo {
@@ -205,8 +200,8 @@ func New(project *openspec.Project, cfg openspec.ProjectConfig, root string, loa
 	return m
 }
 
-func NewSinglePath(project *openspec.Project, cfg openspec.ProjectConfig, root string, loader *openspec.Loader) Model {
-	m := New(project, cfg, root, loader)
+func NewSinglePath(project *openspec.Project, cfg openspec.ProjectConfig, root string, loader *openspec.Loader, theme Theme) Model {
+	m := New(project, cfg, root, loader, theme)
 	m.singlePath = true
 	return m
 }

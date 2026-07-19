@@ -22,9 +22,6 @@ const (
 	LineAdded
 	LineRemoved
 	LineHunkHeader
-
-	addBgColor    = "#1a3a1a"
-	removeBgColor = "#3a1a1a"
 )
 
 type DiffLine struct {
@@ -35,18 +32,20 @@ type DiffLine struct {
 }
 
 var (
-	lexerCache  sync.Map
-	chromaStyle *chroma.Style
-	chromaOnce  sync.Once
+	lexerCache       sync.Map
+	chromaStyleCache = map[string]*chroma.Style{}
 )
 
-func initChromaStyle() {
-	chromaOnce.Do(func() {
-		chromaStyle = styles.Get("monokai")
-		if chromaStyle == nil {
-			chromaStyle = styles.Fallback
-		}
-	})
+func getChromaStyle(name string) *chroma.Style {
+	if s, ok := chromaStyleCache[name]; ok {
+		return s
+	}
+	s := styles.Get(name)
+	if s == nil {
+		s = styles.Fallback
+	}
+	chromaStyleCache[name] = s
+	return s
 }
 
 func getLexer(filename string) chroma.Lexer {
@@ -66,11 +65,11 @@ func getLexer(filename string) chroma.Lexer {
 	return lexer
 }
 
-func highlightLine(content, filename, bgColor string) string {
-	initChromaStyle()
+func highlightLine(content, filename, bgColor, chromaStyleName string) string {
 	if content == "" {
 		return ""
 	}
+	cs := getChromaStyle(chromaStyleName)
 	lexer := getLexer(filename)
 	iterator, err := lexer.Tokenise(nil, content)
 	if err != nil {
@@ -78,7 +77,7 @@ func highlightLine(content, filename, bgColor string) string {
 	}
 	var b strings.Builder
 	for _, token := range iterator.Tokens() {
-		entry := chromaStyle.Get(token.Type)
+		entry := cs.Get(token.Type)
 		style := lipgloss.NewStyle()
 		if entry.Colour.IsSet() {
 			style = style.Foreground(lipgloss.Color(entry.Colour.String()))
@@ -176,7 +175,7 @@ func fmtLineNum(n int) string {
 
 const lineNumWidth = 4
 
-func renderDiff(lines []DiffLine, filename string, width int, scrollX int) string {
+func renderDiff(lines []DiffLine, filename string, width int, scrollX int, chromaStyleName string, addBgColor, removeBgColor string) string {
 	if len(lines) == 0 {
 		return helpStyle.Render("  (no diff available)")
 	}
@@ -195,7 +194,7 @@ func renderDiff(lines []DiffLine, filename string, width int, scrollX int) strin
 			nums := gitStatusAdded.Render(oldNum + " " + newNum)
 			content := scrollContent(dl.Content, scrollX)
 			indicator := gitStatusAdded.Render("+ ")
-			highlighted := highlightLine(content, filename, addBgColor)
+			highlighted := highlightLine(content, filename, addBgColor, chromaStyleName)
 			line := nums + " " + indicator + highlighted
 			line = padLine(line, codeWidth+lineNumWidth*2+3, addBgColor)
 			sb.WriteString(" " + line + "\n")
@@ -205,7 +204,7 @@ func renderDiff(lines []DiffLine, filename string, width int, scrollX int) strin
 			nums := diffRemoved.Render(oldNum + " " + newNum)
 			content := scrollContent(dl.Content, scrollX)
 			indicator := diffRemoved.Render("- ")
-			highlighted := highlightLine(content, filename, removeBgColor)
+			highlighted := highlightLine(content, filename, removeBgColor, chromaStyleName)
 			line := nums + " " + indicator + highlighted
 			line = padLine(line, codeWidth+lineNumWidth*2+3, removeBgColor)
 			sb.WriteString(" " + line + "\n")
@@ -214,7 +213,7 @@ func renderDiff(lines []DiffLine, filename string, width int, scrollX int) strin
 			newNum := fmtLineNum(dl.NewNum)
 			nums := helpStyle.Render(oldNum + " " + newNum)
 			content := scrollContent(dl.Content, scrollX)
-			highlighted := highlightLine(content, filename, "")
+			highlighted := highlightLine(content, filename, "", chromaStyleName)
 			line := nums + "  " + highlighted
 			sb.WriteString(" " + line + "\n")
 		}
