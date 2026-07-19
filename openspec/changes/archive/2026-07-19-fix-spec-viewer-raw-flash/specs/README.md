@@ -1,0 +1,1 @@
+No specification changes required. This is a pure implementation bug fix — existing specs already require content to be displayed as styled markdown, which the message handlers correctly implement. The issue is only in the timing of `SetContent` calls.

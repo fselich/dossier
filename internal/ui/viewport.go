@@ -61,7 +61,7 @@ func (m *Model) loadViewportForConfig() tea.Cmd {
 		return nil
 	}
 	m.loading = true
-	m.vp.SetContent(raw)
+	m.vp.SetContent("")
 	width := m.renderWidth()
 	m.ensureRenderer(width)
 	if m.glamourRenderer == nil {
@@ -89,7 +89,7 @@ func (m *Model) loadViewportForSpec() tea.Cmd {
 		return nil
 	}
 	m.loading = true
-	m.vp.SetContent(raw)
+	m.vp.SetContent("")
 	width := m.renderWidth()
 	m.ensureRenderer(width)
 	if m.glamourRenderer == nil {
@@ -173,7 +173,7 @@ func (m *Model) loadViewportForArtifact() tea.Cmd {
 	}
 
 	m.loading = true
-	m.vp.SetContent(raw)
+	m.vp.SetContent("")
 
 	tab := m.tab
 	width := m.renderWidth()
