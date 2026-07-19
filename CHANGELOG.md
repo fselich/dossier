@@ -2,6 +2,12 @@
 
 # Changelog
 
+## v0.20.0
+
+### Added
+- Experimental theme support via `--theme <name>` flag. Available themes: `dark`, `none` (default), `light`, and `dracula`. The theme controls the color palette of the entire interface, the markdown rendering style, and the syntax highlighting of code diffs.
+- The `none` theme (default) uses the terminal's own background without overriding it. Explicit themes (`dark`, `light`, `dracula`) fill the viewport with a solid background color.
+
 ## v0.19.0
 
 ### Added
