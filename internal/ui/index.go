@@ -759,6 +759,7 @@ func (m Model) updateIndex(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.index.ArchiveCursor = item.idx
 			m.tab = firstAvailableTab(m.index.ArchiveChanges[item.idx])
 			m.mode = ModeViewingArchive
+			m.loadTaskItems()
 			return m.commitStateChange()
 		}
 

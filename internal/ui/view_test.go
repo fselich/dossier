@@ -1681,3 +1681,241 @@ func TestEnsureRendererFallsBackToDarkOnEmptyStyle(t *testing.T) {
 		t.Fatal("ensureRenderer should create a renderer with fallback to dark style when theme has empty GlamourStyle")
 	}
 }
+
+func TestArchiveTasksNavigation(t *testing.T) {
+	t.Run("loadTaskItems populates items from archive change", func(t *testing.T) {
+		m := &Model{
+			mode:  ModeViewingArchive,
+			tab:   TabTasks,
+			theme: DarkTheme,
+			index: indexState{
+				ArchiveCursor: 0,
+				ArchiveChanges: []openspec.Change{
+					{
+						Name: "2024-01-15-test-change",
+						Path: "openspec/changes/archive/2024-01-15-test-change",
+						Tasks: openspec.Artifact{
+							Present: true,
+							Content: "## 1. Section\n\n- [ ] Task one\n- [x] Task two\n",
+						},
+					},
+				},
+			},
+		}
+		m.loadTaskItems()
+		if len(m.tasks.Items) != 3 {
+			t.Fatalf("expected 3 items (1 section + 2 tasks), got %d", len(m.tasks.Items))
+		}
+		if m.tasks.Items[1].Kind != openspec.KindTask {
+			t.Error("expected second item to be a task")
+		}
+		if m.tasks.Items[2].Done != true {
+			t.Error("expected third item to be done")
+		}
+	})
+
+	t.Run("j moves cursor down in archive tasks tab", func(t *testing.T) {
+		m := Model{
+			mode:  ModeViewingArchive,
+			tab:   TabTasks,
+			width: 80,
+			theme: DarkTheme,
+			index: indexState{
+				ArchiveCursor: 0,
+				ArchiveChanges: []openspec.Change{
+					{
+						Name: "2024-01-15-test-change",
+						Path: "openspec/changes/archive/2024-01-15-test-change",
+						Tasks: openspec.Artifact{
+							Present: true,
+							Content: "## 1. Section\n\n- [ ] Task one\n- [ ] Task two\n",
+						},
+					},
+				},
+			},
+			tasks: taskState{
+				Items: []openspec.TaskItem{
+					{Kind: openspec.KindSection, Text: "1. Section"},
+					{Kind: openspec.KindTask, Text: "Task one"},
+					{Kind: openspec.KindTask, Text: "Task two"},
+				},
+				Cursor: 1,
+			},
+		}
+		m.vp = viewport.New(viewport.WithWidth(80), viewport.WithHeight(20))
+		m.vpReady = true
+		m.refreshTasksViewport()
+		if m.vp.View() == "" {
+			t.Error("expected non-empty viewport after render")
+		}
+		result, _ := m.dispatchKey(tea.KeyPressMsg{Text: "j"})
+		updated := result.(Model)
+		if updated.tasks.Cursor != 2 {
+			t.Errorf("expected cursor to move to 2, got %d", updated.tasks.Cursor)
+		}
+	})
+
+	t.Run("k moves cursor up in archive tasks tab", func(t *testing.T) {
+		m := Model{
+			mode:  ModeViewingArchive,
+			tab:   TabTasks,
+			width: 80,
+			theme: DarkTheme,
+			index: indexState{
+				ArchiveCursor: 0,
+				ArchiveChanges: []openspec.Change{
+					{
+						Name: "2024-01-15-test-change",
+						Path: "openspec/changes/archive/2024-01-15-test-change",
+						Tasks: openspec.Artifact{
+							Present: true,
+							Content: "## 1. Section\n\n- [ ] Task one\n- [ ] Task two\n",
+						},
+					},
+				},
+			},
+			tasks: taskState{
+				Items: []openspec.TaskItem{
+					{Kind: openspec.KindSection, Text: "1. Section"},
+					{Kind: openspec.KindTask, Text: "Task one"},
+					{Kind: openspec.KindTask, Text: "Task two"},
+				},
+				Cursor: 2,
+			},
+		}
+		m.vp = viewport.New(viewport.WithWidth(80), viewport.WithHeight(20))
+		m.vpReady = true
+		result, _ := m.dispatchKey(tea.KeyPressMsg{Text: "k"})
+		updated := result.(Model)
+		if updated.tasks.Cursor != 1 {
+			t.Errorf("expected cursor to move to 1, got %d", updated.tasks.Cursor)
+		}
+	})
+}
+
+func TestSpaceIgnoredInArchiveMode(t *testing.T) {
+	m := Model{
+		mode:  ModeViewingArchive,
+		tab:   TabTasks,
+		theme: DarkTheme,
+		index: indexState{
+			ArchiveCursor: 0,
+			ArchiveChanges: []openspec.Change{
+				{
+					Name: "2024-01-15-test-change",
+					Path: "openspec/changes/archive/2024-01-15-test-change",
+					Tasks: openspec.Artifact{
+						Present: true,
+						Content: "## 1. Section\n\n- [ ] Task one\n",
+					},
+				},
+			},
+		},
+		tasks: taskState{
+			Items: []openspec.TaskItem{
+				{Kind: openspec.KindSection, Text: "1. Section"},
+				{Kind: openspec.KindTask, Text: "Task one"},
+			},
+			Cursor: 1,
+		},
+	}
+	m.vp = viewport.New(viewport.WithWidth(80), viewport.WithHeight(20))
+	m.vpReady = true
+	result, cmd := m.dispatchKey(tea.KeyPressMsg{Code: tea.KeySpace})
+	if cmd != nil {
+		t.Error("expected nil cmd for Space in archive mode (toggle blocked)")
+	}
+	updated := result.(Model)
+	if updated.tasks.Items[1].Done {
+		t.Error("expected task to remain not done after Space in archive mode")
+	}
+	if updated.mode != ModeViewingArchive {
+		t.Errorf("expected mode to stay ModeViewingArchive, got %d", updated.mode)
+	}
+}
+
+func TestEditorIgnoredInArchiveMode(t *testing.T) {
+	dir := t.TempDir()
+	changeDir := filepath.Join(dir, "openspec", "changes", "archive", "2024-01-15-test-change")
+	if err := os.MkdirAll(changeDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	tasksContent := "## 1. Section\n\n- [ ] Task one\n"
+	if err := os.WriteFile(filepath.Join(changeDir, "tasks.md"), []byte(tasksContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	m := Model{
+		mode:   ModeViewingArchive,
+		tab:    TabTasks,
+		root:   dir,
+		theme:  DarkTheme,
+		loader: testLoader(),
+		index: indexState{
+			ArchiveCursor: 0,
+			ArchiveChanges: []openspec.Change{
+				{
+					Name: "2024-01-15-test-change",
+					Path: changeDir,
+					Tasks: openspec.Artifact{
+						Present: true,
+						Content: tasksContent,
+					},
+				},
+			},
+		},
+		tasks: taskState{
+			Items: []openspec.TaskItem{
+				{Kind: openspec.KindSection, Text: "1. Section"},
+				{Kind: openspec.KindTask, Text: "Task one"},
+			},
+			Cursor: 1,
+		},
+	}
+	m.vp = viewport.New(viewport.WithWidth(80), viewport.WithHeight(20))
+	m.vpReady = true
+	result, cmd := m.dispatchKey(tea.KeyPressMsg{Text: "e"})
+	if cmd != nil {
+		t.Error("expected nil cmd for e in archive mode (editor blocked)")
+	}
+	updated := result.(Model)
+	if updated.mode != ModeViewingArchive {
+		t.Errorf("expected mode to stay ModeViewingArchive, got %d", updated.mode)
+	}
+}
+
+func TestArchiveLoadViewportUsesTaskView(t *testing.T) {
+	t.Run("loadViewport for archive tasks tab returns nil (uses task list)", func(t *testing.T) {
+		m := &Model{
+			vpReady: true,
+			mode:    ModeViewingArchive,
+			tab:     TabTasks,
+			width:   80,
+			theme:   DarkTheme,
+			index: indexState{
+				ArchiveCursor: 0,
+				ArchiveChanges: []openspec.Change{
+					{
+						Name: "2024-01-15-test-change",
+						Path: "openspec/changes/archive/2024-01-15-test-change",
+						Tasks: openspec.Artifact{
+							Present: true,
+							Content: "## 1. Section\n\n- [ ] Task one\n",
+						},
+					},
+				},
+			},
+			tasks: taskState{
+				Items: []openspec.TaskItem{
+					{Kind: openspec.KindSection, Text: "1. Section"},
+					{Kind: openspec.KindTask, Text: "Task one"},
+				},
+			},
+		}
+		m.vp = viewport.New(viewport.WithWidth(80), viewport.WithHeight(20))
+		cmd := m.loadViewport()
+		if cmd != nil {
+			t.Error("expected nil cmd for archive tasks tab (should use task list, not glamour)")
+		}
+	})
+}

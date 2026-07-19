@@ -149,6 +149,7 @@ func (m Model) clickIndexItem(idx int) (tea.Model, tea.Cmd) {
 		m.index.ArchiveCursor = item.idx
 		m.tab = firstAvailableTab(m.index.ArchiveChanges[item.idx])
 		m.mode = ModeViewingArchive
+		m.loadTaskItems()
 		m.vp.SetHeight(m.contentHeight())
 		return m, m.loadViewport()
 

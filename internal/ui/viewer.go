@@ -229,6 +229,9 @@ func (m Model) updateViewer(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 
 	case "space":
+		if m.mode == ModeViewingArchive {
+			return m, nil
+		}
 		if m.tab == TabTasks {
 			return m, m.doToggle()
 		}
@@ -242,6 +245,9 @@ func (m Model) updateViewer(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "e":
 		if m.tab == TabGit {
 			m.toggleGitDiff()
+			return m, nil
+		}
+		if m.mode == ModeViewingArchive {
 			return m, nil
 		}
 		if m.tabAvailable(m.tab) {

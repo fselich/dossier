@@ -20,7 +20,7 @@ func (m *Model) loadViewport() tea.Cmd {
 		return m.loadViewportForConfig()
 	case m.mode == ModeViewingSpec:
 		return m.loadViewportForSpec()
-	case m.tab == TabTasks && m.mode == ModeNormal:
+	case m.tab == TabTasks && (m.mode == ModeNormal || m.mode == ModeViewingArchive):
 		return m.loadViewportForTasks()
 	case m.tab == TabGit && m.mode == ModeNormal:
 		return m.loadViewportForGit()

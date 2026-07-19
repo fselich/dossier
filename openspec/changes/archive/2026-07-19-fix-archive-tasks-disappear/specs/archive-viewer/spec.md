@@ -1,10 +1,4 @@
-# archive-viewer Specification
-
-## Purpose
-Defines the `ModeViewingArchive` mode for viewing artifacts of an archived change in read-only mode, with the same visual structure as normal mode but without editing or task toggling.
-
-## Requirements
-
+## MODIFIED Requirements
 
 ### Requirement: View artifacts of an archived change
 In `ViewingArchive` mode, the TUI SHALL display the artifacts of the selected archived change using the same visual structure as active changes: header, tab bar, separator, content. Keys `1`-`4`, `j`/`k` and `h`/`l` SHALL work the same as in normal mode to navigate between artifacts, navigate the task cursor on the tasks tab, and scroll on other tabs.
@@ -25,24 +19,6 @@ In `ViewingArchive` mode, the TUI SHALL display the artifacts of the selected ar
 - **WHEN** the mode is `ViewingArchive` and the user presses `h` or `l`
 - **THEN** nothing changes (there is no lateral navigation between archived items)
 
-### Requirement: Visual indicator for archive mode
-When the mode is `ViewingArchive`, the header SHALL display the text `[archive]` instead of the usual position indicator `[N/M]`.
-
-#### Scenario: Header in archive mode
-- **WHEN** the mode is `ViewingArchive`
-- **THEN** the header shows `<project>  ·  <archive-name>  [archive]`
-
-### Requirement: Read-only in archive mode
-In `ViewingArchive` mode, keys `e` (open editor) and `Space` (task toggle) SHALL be silently ignored.
-
-#### Scenario: 'e' ignored in archive mode
-- **WHEN** the mode is `ViewingArchive` and the user presses `e`
-- **THEN** no editor is opened and the state does not change
-
-#### Scenario: 'Space' ignored in archive mode
-- **WHEN** the mode is `ViewingArchive` and the user presses `Space`
-- **THEN** no task changes its state
-
 ### Requirement: Helpbar adaptado en modo archivo
 In `ViewingArchive` mode, the helpbar SHALL show the actual available keys for the current tab, omitting `e` and `Space`, and including `Esc: index`.
 
@@ -53,14 +29,3 @@ In `ViewingArchive` mode, the helpbar SHALL show the actual available keys for t
 #### Scenario: Helpbar on other tabs in archive mode
 - **WHEN** the mode is `ViewingArchive` and the current tab is `proposal`, `design`, or `specs`
 - **THEN** the helpbar shows `1-4/Tab: artifact  j/k: scroll  Esc: index  q: quit`
-
-### Requirement: Volver al índice con Esc o 'a'
-In `ViewingArchive` mode, pressing `Esc` or `a` SHALL close the archive viewer and return to `ModeIndex`.
-
-#### Scenario: Esc vuelve al índice
-- **WHEN** the mode is `ViewingArchive` and the user presses `Esc`
-- **THEN** the mode switches to `ModeIndex`
-
-#### Scenario: 'a' vuelve al índice
-- **WHEN** the mode is `ViewingArchive` and the user presses `a`
-- **THEN** the mode switches to `ModeIndex`
