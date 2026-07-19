@@ -73,12 +73,9 @@ func (m *Model) doToggle() tea.Cmd {
 }
 
 var (
-	rxCode = regexp.MustCompile("`(.+?)`")
-	rxBold = regexp.MustCompile(`\*\*(.+?)\*\*`)
-
-	doneCodeStyle = lipgloss.NewStyle().Underline(true).Foreground(lipgloss.Color("8"))
-	boldStyle     = lipgloss.NewStyle().Bold(true)
-	cyanStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("6"))
+	rxCode    = regexp.MustCompile("`(.+?)`")
+	rxBold    = regexp.MustCompile(`\*\*(.+?)\*\*`)
+	boldStyle = lipgloss.NewStyle().Bold(true)
 )
 
 func extractOpeningEscape(style lipgloss.Style) string {
@@ -90,20 +87,20 @@ func extractOpeningEscape(style lipgloss.Style) string {
 	return ""
 }
 
-func inlineMarkdown(s, restore string, done bool) string {
+func (m *Model) inlineMarkdown(s, restore string, done bool) string {
 	if done {
-		s = rxCode.ReplaceAllStringFunc(s, func(m string) string {
-			return doneCodeStyle.Render(rxCode.FindStringSubmatch(m)[1]) + restore
+		s = rxCode.ReplaceAllStringFunc(s, func(match string) string {
+			return m.theme.Styles.TaskCodeDone.Render(rxCode.FindStringSubmatch(match)[1]) + restore
 		})
-		s = rxBold.ReplaceAllStringFunc(s, func(m string) string {
-			return boldStyle.Render(rxBold.FindStringSubmatch(m)[1]) + restore
+		s = rxBold.ReplaceAllStringFunc(s, func(match string) string {
+			return boldStyle.Render(rxBold.FindStringSubmatch(match)[1]) + restore
 		})
 	} else {
-		s = rxCode.ReplaceAllStringFunc(s, func(m string) string {
-			return cyanStyle.Render(rxCode.FindStringSubmatch(m)[1]) + restore
+		s = rxCode.ReplaceAllStringFunc(s, func(match string) string {
+			return m.theme.Styles.TaskCodeCyan.Render(rxCode.FindStringSubmatch(match)[1]) + restore
 		})
-		s = rxBold.ReplaceAllStringFunc(s, func(m string) string {
-			return boldStyle.Render(rxBold.FindStringSubmatch(m)[1]) + restore
+		s = rxBold.ReplaceAllStringFunc(s, func(match string) string {
+			return boldStyle.Render(rxBold.FindStringSubmatch(match)[1]) + restore
 		})
 	}
 	return s
@@ -114,8 +111,8 @@ func (m *Model) renderTasksContent() (string, int) {
 	line, cursorLine := 0, 0
 	contentWidth := m.width - 2
 
-	pendingRestore := extractOpeningEscape(taskPendingStyle)
-	doneRestore := extractOpeningEscape(taskDoneStyle)
+	pendingRestore := extractOpeningEscape(m.theme.Styles.TaskPending)
+	doneRestore := extractOpeningEscape(m.theme.Styles.TaskDone)
 
 	for i, item := range m.tasks.Items {
 		switch item.Kind {
@@ -129,10 +126,10 @@ func (m *Model) renderTasksContent() (string, int) {
 			}
 			prefix := "  "
 			if i == m.tasks.Cursor {
-				prefix = taskCursorMarkStyle.Render("▶") + " "
+				prefix = m.theme.Styles.TaskCursorMark.Render("▶") + " "
 			}
 			done, total := sectionProgress(m.tasks.Items, i)
-			sectionLine := sectionStyle.Render(prefix+item.Text) + "  " + progressBar(done, total, 5)
+			sectionLine := m.theme.Styles.Section.Render(prefix+item.Text) + "  " + m.progressBar(done, total, 5)
 			sb.WriteString(sectionLine + "\n")
 			line += lipgloss.Height(sectionLine)
 			sb.WriteString("\n")
@@ -151,18 +148,18 @@ func (m *Model) renderTasksContent() (string, int) {
 			}
 			var prefix string
 			if i == m.tasks.Cursor {
-				prefix = taskCursorMarkStyle.Render("▶") + restore + " "
-				checkbox = taskCursorMarkStyle.Render(checkbox) + restore
+				prefix = m.theme.Styles.TaskCursorMark.Render("▶") + restore + " "
+				checkbox = m.theme.Styles.TaskCursorMark.Render(checkbox) + restore
 			} else {
 				prefix = "  "
 			}
-			text := prefix + checkbox + " " + inlineMarkdown(item.Text, restore, item.Done)
+			text := prefix + checkbox + " " + m.inlineMarkdown(item.Text, restore, item.Done)
 			var rendered string
 			switch {
 			case item.Done:
-				rendered = taskDoneStyle.Width(contentWidth).Render(text)
+				rendered = m.theme.Styles.TaskDone.Width(contentWidth).Render(text)
 			default:
-				rendered = taskPendingStyle.Width(contentWidth).Render(text)
+				rendered = m.theme.Styles.TaskPending.Width(contentWidth).Render(text)
 			}
 			sb.WriteString(rendered + "\n")
 			line += lipgloss.Height(rendered)
@@ -184,21 +181,21 @@ func sectionProgress(items []openspec.TaskItem, sectionIdx int) (done, total int
 	return
 }
 
-func renderProgressBar(done, total, width int, filledChar, emptyChar string) string {
+func (m *Model) renderProgressBar(done, total, width int, filledChar, emptyChar string) string {
 	if total == 0 || width <= 0 {
 		return ""
 	}
 	filled := (done * width) / total
-	filledStyle := progressDoneStyle
+	filledStyle := m.theme.Styles.ProgressDone
 	if done == total {
 		filled = width
-		filledStyle = progressCompleteStyle
+		filledStyle = m.theme.Styles.ProgressComplete
 	}
 	return filledStyle.Render(strings.Repeat(filledChar, filled)) +
-		progressEmptyStyle.Render(strings.Repeat(emptyChar, width-filled))
+		m.theme.Styles.ProgressEmpty.Render(strings.Repeat(emptyChar, width-filled))
 }
 
-func progressBar(done, total, width int) string {
-	bar := renderProgressBar(done, total, width, "─", "─")
-	return bar + helpStyle.Render(fmt.Sprintf(" %d/%d", done, total))
+func (m *Model) progressBar(done, total, width int) string {
+	bar := m.renderProgressBar(done, total, width, "─", "─")
+	return bar + m.theme.Styles.Help.Render(fmt.Sprintf(" %d/%d", done, total))
 }

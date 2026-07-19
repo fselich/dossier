@@ -2,6 +2,17 @@
 
 # Changelog
 
+## v0.20.0
+
+### Añadido
+- Soporte experimental de temas mediante el flag `--theme <nombre>`. Temas disponibles: `dark`, `none` (por defecto), `light` y `dracula`. El tema controla la paleta de colores de toda la interfaz, el estilo de renderizado del markdown y el resaltado de sintaxis de los diffs de código.
+- El tema `none` (por defecto) respeta el fondo del terminal sin sobreescribirlo. Los temas explícitos (`dark`, `light`, `dracula`) rellenan todo el viewport con un color de fondo sólido.
+
+## v0.19.0
+
+### Añadido
+- `PgDown` y `PgUp` ahora desplazan los documentos una página completa de una sola vez — en artefactos, el visor de specs y la vista de configuración. ¡Gracias [arnd-s](https://github.com/arnd-s) por la contribución!
+
 ## v0.18.0
 
 ### Añadido

@@ -42,9 +42,9 @@ func (m *Model) viewContentWithChrome() string {
 
 func (m *Model) emptyViewContent() string {
 	return m.boxTop() + "\n" +
-		m.addBorderSides(headerStyle.Render(m.project.Name)+
+		m.addBorderSides(m.theme.Styles.Header.Render(m.project.Name)+
 			"\n\n\n  No active changes. Create one with /opsx:propose\n"+
-			helpStyle.Render("\n  a/Esc: index  q: quit")) + "\n" +
+			m.theme.Styles.Help.Render("\n  a/Esc: index  q: quit")) + "\n" +
 		m.boxInnerSep() + "\n" +
 		m.addBorderSides(m.renderHelpBar()) + "\n" +
 		m.boxBottom()
@@ -52,10 +52,10 @@ func (m *Model) emptyViewContent() string {
 
 func (m *Model) renderHeader() string {
 	if m.mode == ModeViewingConfig {
-		return headerStyle.Width(m.width - 2).Render(m.project.Name + "  ·  project config")
+		return m.theme.Styles.Header.Width(m.width - 2).Render(m.project.Name + "  ·  project config")
 	}
 	if m.mode == ModeIndex {
-		return headerStyle.Width(m.width - 2).Render(m.project.Name + "  ·  index")
+		return m.theme.Styles.Header.Width(m.width - 2).Render(m.project.Name + "  ·  index")
 	}
 	if m.mode == ModeViewingSpec {
 		specName := ""
@@ -64,25 +64,25 @@ func (m *Model) renderHeader() string {
 		}
 		if m.specViewer.FocusMode && m.specViewer.Cursor < len(m.projectSpecs) {
 			ps := m.projectSpecs[m.specViewer.Cursor]
-			return headerStyle.Width(m.width - 2).Render(
+			return m.theme.Styles.Header.Width(m.width - 2).Render(
 				fmt.Sprintf("%s  ·  %s  ·  Req %d/%d", m.project.Name, specName, m.specViewer.ReqCursor+1, len(ps.RequirementNames)),
 			)
 		}
-		return headerStyle.Width(m.width - 2).Render(
+		return m.theme.Styles.Header.Width(m.width - 2).Render(
 			fmt.Sprintf("%s  ·  %s  [spec]", m.project.Name, specName),
 		)
 	}
 	ch := m.current()
 	if ch == nil {
-		return headerStyle.Render(m.project.Name)
+		return m.theme.Styles.Header.Render(m.project.Name)
 	}
 	if m.mode == ModeViewingArchive {
-		return headerStyle.Width(m.width - 2).Render(
+		return m.theme.Styles.Header.Width(m.width - 2).Render(
 			fmt.Sprintf("%s  ·  %s  [archive]", m.project.Name, ch.Name),
 		)
 	}
 	nav := fmt.Sprintf("[%d/%d]", m.changeIdx+1, len(m.project.Changes))
-	return headerStyle.Width(m.width - 2).Render(
+	return m.theme.Styles.Header.Width(m.width - 2).Render(
 		fmt.Sprintf("%s  ·  %s  %s", m.project.Name, ch.Name, nav),
 	)
 }
@@ -99,11 +99,11 @@ func (m *Model) renderTabBar() string {
 		}
 		switch {
 		case t == m.tab:
-			parts = append(parts, tabActiveStyle.Render(label))
+			parts = append(parts, m.theme.Styles.TabActive.Render(label))
 		case !m.tabAvailable(t):
-			parts = append(parts, tabDisabledStyle.Render(label))
+			parts = append(parts, m.theme.Styles.TabDisabled.Render(label))
 		default:
-			parts = append(parts, tabInactiveStyle.Render(label))
+			parts = append(parts, m.theme.Styles.TabInactive.Render(label))
 		}
 	}
 	tabs := strings.Join(parts, " ")
@@ -129,7 +129,7 @@ func (m *Model) renderTabBar() string {
 		label := fmt.Sprintf(" %d/%d", done, total)
 		barSpace := (m.width - 2) - lipgloss.Width(tabs) - 3 - len(label)
 		if barSpace >= 3 {
-			tabs = tabs + " [" + renderProgressBar(done, total, barSpace, "█", "░") + "]" + helpStyle.Render(label)
+			tabs = tabs + " [" + m.renderProgressBar(done, total, barSpace, "█", "░") + "]" + m.theme.Styles.Help.Render(label)
 		}
 	}
 	return tabs
@@ -143,9 +143,9 @@ func (m *Model) renderSpecSubnav() string {
 	var parts []string
 	for i, s := range ch.SpecFiles {
 		if i == m.specIdx {
-			parts = append(parts, tabActiveStyle.Render(s.Name))
+			parts = append(parts, m.theme.Styles.TabActive.Render(s.Name))
 		} else {
-			parts = append(parts, tabInactiveStyle.Render(s.Name))
+			parts = append(parts, m.theme.Styles.TabInactive.Render(s.Name))
 		}
 	}
 	return strings.Join(parts, " ")
@@ -157,15 +157,15 @@ func (m *Model) hasSpecSubnav() bool {
 }
 
 func (m *Model) boxTop() string {
-	return separatorStyle.Render("┌" + strings.Repeat("─", m.width-2) + "┐")
+	return m.theme.Styles.Separator.Render("┌" + strings.Repeat("─", m.width-2) + "┐")
 }
 
 func (m *Model) boxBottom() string {
-	return separatorStyle.Render("└" + strings.Repeat("─", m.width-2) + "┘")
+	return m.theme.Styles.Separator.Render("└" + strings.Repeat("─", m.width-2) + "┘")
 }
 
 func (m *Model) boxInnerSep() string {
-	return separatorStyle.Render("├" + strings.Repeat("─", m.width-2) + "┤")
+	return m.theme.Styles.Separator.Render("├" + strings.Repeat("─", m.width-2) + "┤")
 }
 
 func (m *Model) addBorderSides(content string) string {
@@ -180,18 +180,18 @@ func (m *Model) addBorderSides(content string) string {
 		if pad < 0 {
 			pad = 0
 		}
-		result = append(result, separatorStyle.Render("│")+line+strings.Repeat(" ", pad)+separatorStyle.Render("│"))
+		result = append(result, m.theme.Styles.Separator.Render("│")+line+strings.Repeat(" ", pad)+m.theme.Styles.Separator.Render("│"))
 	}
 	return strings.Join(result, "\n")
 }
 
 func (m *Model) renderHelpBar() string {
 	if m.errMsg != "" {
-		return errStyle.Render(m.errMsg)
+		return m.theme.Styles.Error.Render(m.errMsg)
 	}
 	if m.mode == ModeIndex {
 		if m.index.FilterActive {
-			return helpStyle.Render("/" + m.index.FilterText + "█")
+			return m.theme.Styles.Help.Render("/" + m.index.FilterText + "█")
 		}
 		sortHint := "s: sort by suffix"
 		if m.index.SortBySuffix {
@@ -201,19 +201,19 @@ func (m *Model) renderHelpBar() string {
 		if m.index.FilterText != "" {
 			text += "  [/" + m.index.FilterText + "]"
 		}
-		return helpStyle.Render(text)
+		return m.theme.Styles.Help.Render(text)
 	}
 	if m.mode == ModeViewingConfig {
-		return helpStyle.Render("j/k: scroll  i/Esc: back  q: quit")
+		return m.theme.Styles.Help.Render("j/k: scroll  i/Esc: back  q: quit")
 	}
 	if m.mode == ModeViewingSpec {
 		if m.specViewer.FocusMode {
-			return helpStyle.Render("h/l: req anterior/siguiente  j/k: scroll  Esc: index  q: quit")
+			return m.theme.Styles.Help.Render("h/l: req anterior/siguiente  j/k: scroll  Esc: index  q: quit")
 		}
-		return helpStyle.Render("j/k: scroll  Esc: index  q: quit")
+		return m.theme.Styles.Help.Render("j/k: scroll  Esc: index  q: quit")
 	}
 	if m.mode == ModeViewingArchive {
-		return helpStyle.Render("1-4/Tab: artifact  j/k: scroll  a/Esc: index  q: quit")
+		return m.theme.Styles.Help.Render("1-4/Tab: artifact  j/k: scroll  a/Esc: index  q: quit")
 	}
 	tabRange := "1-4"
 	if m.isGitRepo {
@@ -221,15 +221,15 @@ func (m *Model) renderHelpBar() string {
 	}
 	if m.tab == TabGit {
 		if m.gitState.ErrMsg != "" {
-			return errStyle.Render(m.gitState.ErrMsg)
+			return m.theme.Styles.Error.Render(m.gitState.ErrMsg)
 		}
 		if m.gitState.ShowingDiff {
-			return helpStyle.Render("d/Esc: back  [/]: prev/next  j/k: vertical  h/l: ←→ horizontal  q: quit")
+			return m.theme.Styles.Help.Render("d/Esc: back  [/]: prev/next  j/k: vertical  h/l: ←→ horizontal  q: quit")
 		}
-		return helpStyle.Render("h/l: change  " + tabRange + "/Tab: artifact  j/k: navigate  Enter/e: open file  d: view diff  s: stage/unstage  Esc: index  q: quit")
+		return m.theme.Styles.Help.Render("h/l: change  " + tabRange + "/Tab: artifact  j/k: navigate  Enter/e: open file  d: view diff  s: stage/unstage  Esc: index  q: quit")
 	}
 	if m.tab == TabTasks {
-		return helpStyle.Render("h/l: change  " + tabRange + "/Tab: artifact  j/k: navigate  Space: toggle  e: edit  i: info  Esc: index  q: quit")
+		return m.theme.Styles.Help.Render("h/l: change  " + tabRange + "/Tab: artifact  j/k: navigate  Space: toggle  e: edit  i: info  Esc: index  q: quit")
 	}
-	return helpStyle.Render("h/l: change  " + tabRange + "/Tab: artifact  j/k: scroll  e: edit  i: info  Esc: index  q: quit")
+	return m.theme.Styles.Help.Render("h/l: change  " + tabRange + "/Tab: artifact  j/k: scroll  e: edit  i: info  Esc: index  q: quit")
 }

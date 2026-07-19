@@ -348,7 +348,7 @@ func (m *Model) renderIndexContent() (string, int) {
 		sectionName := sectionNames[sectionIdx]
 		header := fmt.Sprintf("%s (%d)", sectionName, totalCount)
 		if isCollapsed {
-			header += " " + helpStyle.Render("…")
+			header += " " + m.theme.Styles.Help.Render("…")
 		}
 
 		cursor := m.isCursorAt(i)
@@ -357,9 +357,9 @@ func (m *Model) renderIndexContent() (string, int) {
 		}
 		cursorMark := "  "
 		if cursor {
-			cursorMark = progressDoneStyle.Render("▶") + " "
+			cursorMark = m.theme.Styles.ProgressDone.Render("▶") + " "
 		}
-		sb.WriteString(cursorMark + sectionStyle.Render(header) + "\n")
+		sb.WriteString(cursorMark + m.theme.Styles.Section.Render(header) + "\n")
 		line++
 
 		sb.WriteString("\n")
@@ -381,7 +381,7 @@ func (m *Model) renderIndexContent() (string, int) {
 		}
 
 		if totalCount == 0 {
-			sb.WriteString(helpStyle.Render("  "+sectionEmptyMsg(sectionIdx)) + "\n")
+			sb.WriteString(m.theme.Styles.Help.Render("  "+sectionEmptyMsg(sectionIdx)) + "\n")
 			line++
 			i = m.skipToNextSection(i)
 			if sectionIdx != sectionArchived {
@@ -413,20 +413,20 @@ func (m *Model) renderIndexContent() (string, int) {
 			case indexKindSpec:
 				ps := m.projectSpecs[childItem.idx]
 				pad := strings.Repeat(" ", maxSpecName-len(ps.Name))
-				label := helpStyle.Render(fmt.Sprintf("%*d requirements", maxReqDigits, ps.RequirementCount))
+				label := m.theme.Styles.Help.Render(fmt.Sprintf("%*d requirements", maxReqDigits, ps.RequirementCount))
 				cursorMark := "  "
-				name := ps.Name
+				name := m.theme.Styles.BaseText.Render(ps.Name)
 				if childCursor {
-					cursorMark = progressDoneStyle.Render("▶") + " "
-					name = indexActiveStyle.Render(ps.Name)
+					cursorMark = m.theme.Styles.ProgressDone.Render("▶") + " "
+					name = m.theme.Styles.IndexActive.Render(ps.Name)
 				}
 				sb.WriteString(cursorMark + name + pad + "  " + label + "\n")
 			case indexKindRequirement:
 				reqMark := "    "
-				rName := taskPendingStyle.Render(m.projectSpecs[childItem.idx].RequirementNames[childItem.reqIdx])
+				rName := m.theme.Styles.TaskPending.Render(m.projectSpecs[childItem.idx].RequirementNames[childItem.reqIdx])
 				if childCursor {
-					reqMark = "  " + progressDoneStyle.Render("▶") + " "
-					rName = indexActiveStyle.Render(m.projectSpecs[childItem.idx].RequirementNames[childItem.reqIdx])
+					reqMark = "  " + m.theme.Styles.ProgressDone.Render("▶") + " "
+					rName = m.theme.Styles.IndexActive.Render(m.projectSpecs[childItem.idx].RequirementNames[childItem.reqIdx])
 				}
 				sb.WriteString(reqMark + rName + "\n")
 			case indexKindArchived:
@@ -437,7 +437,7 @@ func (m *Model) renderIndexContent() (string, int) {
 		}
 
 		if !anyVisible {
-			sb.WriteString(helpStyle.Render("  No items match '"+m.index.FilterText+"'") + "\n")
+			sb.WriteString(m.theme.Styles.Help.Render("  No items match '"+m.index.FilterText+"'") + "\n")
 			line++
 		}
 
@@ -488,7 +488,7 @@ func (m *Model) renderActiveItem(ch openspec.Change, cursor bool, contentWidth i
 
 	cursorMark := "  "
 	if cursor {
-		cursorMark = progressDoneStyle.Render("▶") + " "
+		cursorMark = m.theme.Styles.ProgressDone.Render("▶") + " "
 	}
 
 	const nameColWidth = 32
@@ -500,9 +500,9 @@ func (m *Model) renderActiveItem(ch openspec.Change, cursor bool, contentWidth i
 
 	var renderedName string
 	if cursor {
-		renderedName = indexActiveStyle.Render(paddedName)
+		renderedName = m.theme.Styles.IndexActive.Render(paddedName)
 	} else {
-		renderedName = paddedName
+		renderedName = m.theme.Styles.BaseText.Render(paddedName)
 	}
 
 	if total == 0 {
@@ -515,14 +515,14 @@ func (m *Model) renderActiveItem(ch openspec.Change, cursor bool, contentWidth i
 		barSpace = 4
 	}
 	filled := (done * barSpace) / total
-	filledStyle := progressDoneStyle
+	filledStyle := m.theme.Styles.ProgressDone
 	if done == total {
 		filled = barSpace
-		filledStyle = progressCompleteStyle
+		filledStyle = m.theme.Styles.ProgressComplete
 	}
 	bar := "[" + filledStyle.Render(strings.Repeat("█", filled)) +
-		progressEmptyStyle.Render(strings.Repeat("░", barSpace-filled)) + "]" +
-		helpStyle.Render(countStr)
+		m.theme.Styles.ProgressEmpty.Render(strings.Repeat("░", barSpace-filled)) + "]" +
+		m.theme.Styles.Help.Render(countStr)
 
 	return cursorMark + renderedName + bar
 }
@@ -530,14 +530,14 @@ func (m *Model) renderActiveItem(ch openspec.Change, cursor bool, contentWidth i
 func (m *Model) renderArchivedItem(ch openspec.Change, cursor bool, maxName int) string {
 	cursorMark := "  "
 	if cursor {
-		cursorMark = progressDoneStyle.Render("▶") + " "
+		cursorMark = m.theme.Styles.ProgressDone.Render("▶") + " "
 	}
 
 	pad := strings.Repeat(" ", maxName-len(ch.Name))
-	date := helpStyle.Render(ch.DisplayDate)
-	name := ch.Name + pad
+	date := m.theme.Styles.Help.Render(ch.DisplayDate)
+	name := m.theme.Styles.BaseText.Render(ch.Name) + pad
 	if cursor {
-		name = indexActiveStyle.Render(ch.Name) + pad
+		name = m.theme.Styles.IndexActive.Render(ch.Name) + pad
 	}
 
 	return cursorMark + name + "  " + date

@@ -1642,3 +1642,42 @@ func TestGitSInactiveCleanTree(t *testing.T) {
 		t.Error("expected s to be a no-op on clean tree")
 	}
 }
+
+func TestGetChromaStyleValid(t *testing.T) {
+	cs := getChromaStyle("monokai")
+	if cs == nil {
+		t.Fatal("getChromaStyle(monokai) should not return nil")
+	}
+}
+
+func TestGetChromaStyleInvalidFallback(t *testing.T) {
+	defer func() {
+		if r := recover(); r != nil {
+			t.Errorf("getChromaStyle should not panic on invalid name: %v", r)
+		}
+	}()
+	cs := getChromaStyle("nonexistent-style")
+	if cs == nil {
+		t.Fatal("getChromaStyle should return Fallback, not nil, for invalid name")
+	}
+}
+
+func TestEnsureRendererUsesThemeStyle(t *testing.T) {
+	m := &Model{
+		theme: DarkTheme,
+	}
+	m.ensureRenderer(80)
+	if m.glamourRenderer == nil {
+		t.Fatal("ensureRenderer should create a renderer for dark theme")
+	}
+}
+
+func TestEnsureRendererFallsBackToDarkOnEmptyStyle(t *testing.T) {
+	m := &Model{
+		theme: Theme{},
+	}
+	m.ensureRenderer(80)
+	if m.glamourRenderer == nil {
+		t.Fatal("ensureRenderer should create a renderer with fallback to dark style when theme has empty GlamourStyle")
+	}
+}
