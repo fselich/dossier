@@ -3,4 +3,6 @@
 /sv
 .claude/
 .opencode/
+.reasonix/
 docs/
+reasonix.toml

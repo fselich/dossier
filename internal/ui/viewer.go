@@ -177,8 +177,12 @@ func (m Model) updateViewer(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "j", "down":
 		switch m.tab {
 		case TabTasks:
-			m.moveCursorDown()
-			m.refreshTasksViewport()
+			if m.mode == ModeViewingArchive {
+				m.vp.ScrollDown(1)
+			} else {
+				m.moveCursorDown()
+				m.refreshTasksViewport()
+			}
 		case TabGit:
 			if m.gitState.ShowingDiff {
 				m.vp.ScrollDown(1)
@@ -204,8 +208,12 @@ func (m Model) updateViewer(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "k", "up":
 		switch m.tab {
 		case TabTasks:
-			m.moveCursorUp()
-			m.refreshTasksViewport()
+			if m.mode == ModeViewingArchive {
+				m.vp.ScrollUp(1)
+			} else {
+				m.moveCursorUp()
+				m.refreshTasksViewport()
+			}
 		case TabGit:
 			if m.gitState.ShowingDiff {
 				m.vp.ScrollUp(1)
