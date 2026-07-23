@@ -213,9 +213,6 @@ func (m *Model) renderHelpBar() string {
 		return m.theme.Styles.Help.Render("j/k: scroll  Esc: index  q: quit")
 	}
 	if m.mode == ModeViewingArchive {
-		if m.tab == TabTasks {
-			return m.theme.Styles.Help.Render("1-4/Tab: artifact  j/k: navigate  a/Esc: index  q: quit")
-		}
 		return m.theme.Styles.Help.Render("1-4/Tab: artifact  j/k: scroll  a/Esc: index  q: quit")
 	}
 	tabRange := "1-4"

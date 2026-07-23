@@ -1714,7 +1714,7 @@ func TestArchiveTasksNavigation(t *testing.T) {
 		}
 	})
 
-	t.Run("j moves cursor down in archive tasks tab", func(t *testing.T) {
+	t.Run("j scrolls viewport in archive tasks tab", func(t *testing.T) {
 		m := Model{
 			mode:  ModeViewingArchive,
 			tab:   TabTasks,
@@ -1744,18 +1744,21 @@ func TestArchiveTasksNavigation(t *testing.T) {
 		}
 		m.vp = viewport.New(viewport.WithWidth(80), viewport.WithHeight(20))
 		m.vpReady = true
-		m.refreshTasksViewport()
-		if m.vp.View() == "" {
-			t.Error("expected non-empty viewport after render")
-		}
+		// Pre-set viewport content and YOffset to verify scroll
+		m.vp.SetContent(strings.Repeat("line\n", 50))
+		m.vp.SetYOffset(0)
 		result, _ := m.dispatchKey(tea.KeyPressMsg{Text: "j"})
 		updated := result.(Model)
-		if updated.tasks.Cursor != 2 {
-			t.Errorf("expected cursor to move to 2, got %d", updated.tasks.Cursor)
+		if updated.vp.YOffset() != 1 {
+			t.Errorf("expected viewport to scroll down by 1, got YOffset=%d", updated.vp.YOffset())
+		}
+		// Cursor should NOT move in archive mode
+		if updated.tasks.Cursor != 1 {
+			t.Errorf("expected cursor to stay at 1, got %d", updated.tasks.Cursor)
 		}
 	})
 
-	t.Run("k moves cursor up in archive tasks tab", func(t *testing.T) {
+	t.Run("k scrolls viewport in archive tasks tab", func(t *testing.T) {
 		m := Model{
 			mode:  ModeViewingArchive,
 			tab:   TabTasks,
@@ -1785,10 +1788,15 @@ func TestArchiveTasksNavigation(t *testing.T) {
 		}
 		m.vp = viewport.New(viewport.WithWidth(80), viewport.WithHeight(20))
 		m.vpReady = true
+		m.vp.SetContent(strings.Repeat("line\n", 50))
+		m.vp.SetYOffset(3)
 		result, _ := m.dispatchKey(tea.KeyPressMsg{Text: "k"})
 		updated := result.(Model)
-		if updated.tasks.Cursor != 1 {
-			t.Errorf("expected cursor to move to 1, got %d", updated.tasks.Cursor)
+		if updated.vp.YOffset() != 2 {
+			t.Errorf("expected viewport to scroll up by 1, got YOffset=%d", updated.vp.YOffset())
+		}
+		if updated.tasks.Cursor != 2 {
+			t.Errorf("expected cursor to stay at 2, got %d", updated.tasks.Cursor)
 		}
 	})
 }
@@ -1884,8 +1892,8 @@ func TestEditorIgnoredInArchiveMode(t *testing.T) {
 	}
 }
 
-func TestArchiveLoadViewportUsesTaskView(t *testing.T) {
-	t.Run("loadViewport for archive tasks tab returns nil (uses task list)", func(t *testing.T) {
+func TestArchiveLoadViewportUsesGlamour(t *testing.T) {
+	t.Run("loadViewport for archive tasks tab returns glamour cmd", func(t *testing.T) {
 		m := &Model{
 			vpReady: true,
 			mode:    ModeViewingArchive,
@@ -1905,17 +1913,39 @@ func TestArchiveLoadViewportUsesTaskView(t *testing.T) {
 					},
 				},
 			},
-			tasks: taskState{
-				Items: []openspec.TaskItem{
-					{Kind: openspec.KindSection, Text: "1. Section"},
-					{Kind: openspec.KindTask, Text: "Task one"},
+		}
+		m.vp = viewport.New(viewport.WithWidth(80), viewport.WithHeight(20))
+		cmd := m.loadViewport()
+		if cmd == nil {
+			t.Error("expected non-nil cmd for archive tasks tab (should use glamour, not task list)")
+		}
+	})
+
+	t.Run("loadViewport for archive proposal tab returns glamour cmd", func(t *testing.T) {
+		m := &Model{
+			vpReady: true,
+			mode:    ModeViewingArchive,
+			tab:     TabProposal,
+			width:   80,
+			theme:   DarkTheme,
+			index: indexState{
+				ArchiveCursor: 0,
+				ArchiveChanges: []openspec.Change{
+					{
+						Name: "2024-01-15-test-change",
+						Path: "openspec/changes/archive/2024-01-15-test-change",
+						Proposal: openspec.Artifact{
+							Present: true,
+							Content: "# Proposal\n\nTest content\n",
+						},
+					},
 				},
 			},
 		}
 		m.vp = viewport.New(viewport.WithWidth(80), viewport.WithHeight(20))
 		cmd := m.loadViewport()
-		if cmd != nil {
-			t.Error("expected nil cmd for archive tasks tab (should use task list, not glamour)")
+		if cmd == nil {
+			t.Error("expected non-nil cmd for archive proposal tab (glamour path)")
 		}
 	})
 }
