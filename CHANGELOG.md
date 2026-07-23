@@ -2,6 +2,11 @@
 
 # Changelog
 
+## v0.20.1
+
+### Fixed
+- Archived changes now render their tasks as a read-only markdown view (glamour-rendered), matching every other tab. The progress bar and navigable cursor are removed, fixing a bug where pressing arrow keys would blank the task list.
+
 ## v0.20.0
 
 ### Added

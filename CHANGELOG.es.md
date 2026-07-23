@@ -2,6 +2,11 @@
 
 # Changelog
 
+## v0.20.1
+
+### Corregido
+- Los cambios archivados ahora muestran sus tareas como vista markdown de solo lectura (renderizado glamour), igual que el resto de pestañas. Se elimina la barra de progreso y el cursor navegable, que causaban un bug donde las tareas desaparecían al pulsar las flechas.
+
 ## v0.20.0
 
 ### Añadido
