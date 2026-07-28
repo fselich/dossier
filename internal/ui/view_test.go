@@ -425,7 +425,7 @@ func TestRenderTasksContent(t *testing.T) {
 				Cursor: 1,
 			},
 		}
-		content, cursorLine := m.renderTasksContent()
+		content, cursorLine, _ := m.renderTasksContent()
 		if cursorLine == 0 {
 			t.Error("expected non-zero cursor line")
 		}
@@ -442,7 +442,7 @@ func TestRenderTasksContent(t *testing.T) {
 				Cursor: 0,
 			},
 		}
-		content, _ := m.renderTasksContent()
+		content, _, _ := m.renderTasksContent()
 		if content != "" {
 			t.Errorf("expected empty content, got %q", content)
 		}
@@ -562,9 +562,93 @@ func TestUpdateKeyPresses(t *testing.T) {
 		}
 	})
 
-	t.Run("pgdown is a no-op on task list", func(t *testing.T) {
+	t.Run("pgdown pages the cursor down a full screen in live task list", func(t *testing.T) {
+		items := make([]openspec.TaskItem, 40)
+		for i := range items {
+			items[i] = openspec.TaskItem{Kind: openspec.KindTask, Text: "task"}
+		}
 		m := Model{
-			mode: ModeNormal,
+			mode:  ModeNormal,
+			tab:   TabTasks,
+			width: 80,
+			tasks: taskState{Items: items, Cursor: 0},
+		}
+		m.vp = viewport.New(viewport.WithWidth(78), viewport.WithHeight(10))
+		m.refreshTasksViewport()
+		msg := tea.KeyPressMsg{Code: tea.KeyPgDown}
+		result, _ := m.dispatchKey(msg)
+		updated := result.(Model)
+		if updated.tasks.Cursor != 10 {
+			t.Errorf("expected cursor to land at item 10 (one page down), got %d", updated.tasks.Cursor)
+		}
+	})
+
+	t.Run("pgup pages the cursor up a full screen in live task list", func(t *testing.T) {
+		items := make([]openspec.TaskItem, 40)
+		for i := range items {
+			items[i] = openspec.TaskItem{Kind: openspec.KindTask, Text: "task"}
+		}
+		m := Model{
+			mode:  ModeNormal,
+			tab:   TabTasks,
+			width: 80,
+			tasks: taskState{Items: items, Cursor: 30},
+		}
+		m.vp = viewport.New(viewport.WithWidth(78), viewport.WithHeight(10))
+		m.refreshTasksViewport()
+		msg := tea.KeyPressMsg{Code: tea.KeyPgUp}
+		result, _ := m.dispatchKey(msg)
+		updated := result.(Model)
+		if updated.tasks.Cursor != 20 {
+			t.Errorf("expected cursor to land at item 20 (one page up), got %d", updated.tasks.Cursor)
+		}
+	})
+
+	t.Run("pgdown clamps to last item near end of list", func(t *testing.T) {
+		items := make([]openspec.TaskItem, 5)
+		for i := range items {
+			items[i] = openspec.TaskItem{Kind: openspec.KindTask, Text: "task"}
+		}
+		m := Model{
+			mode:  ModeNormal,
+			tab:   TabTasks,
+			width: 80,
+			tasks: taskState{Items: items, Cursor: 4},
+		}
+		m.vp = viewport.New(viewport.WithWidth(78), viewport.WithHeight(10))
+		m.refreshTasksViewport()
+		msg := tea.KeyPressMsg{Code: tea.KeyPgDown}
+		result, _ := m.dispatchKey(msg)
+		updated := result.(Model)
+		if updated.tasks.Cursor != 4 {
+			t.Errorf("expected cursor to clamp at last item (4), got %d", updated.tasks.Cursor)
+		}
+	})
+
+	t.Run("pgup clamps to first item near start of list", func(t *testing.T) {
+		items := make([]openspec.TaskItem, 5)
+		for i := range items {
+			items[i] = openspec.TaskItem{Kind: openspec.KindTask, Text: "task"}
+		}
+		m := Model{
+			mode:  ModeNormal,
+			tab:   TabTasks,
+			width: 80,
+			tasks: taskState{Items: items, Cursor: 0},
+		}
+		m.vp = viewport.New(viewport.WithWidth(78), viewport.WithHeight(10))
+		m.refreshTasksViewport()
+		msg := tea.KeyPressMsg{Code: tea.KeyPgUp}
+		result, _ := m.dispatchKey(msg)
+		updated := result.(Model)
+		if updated.tasks.Cursor != 0 {
+			t.Errorf("expected cursor to clamp at first item (0), got %d", updated.tasks.Cursor)
+		}
+	})
+
+	t.Run("pgdown scrolls archived tasks viewport", func(t *testing.T) {
+		m := Model{
+			mode: ModeViewingArchive,
 			tab:  TabTasks,
 		}
 		m.vp = viewport.New(viewport.WithWidth(80), viewport.WithHeight(10))
@@ -572,8 +656,26 @@ func TestUpdateKeyPresses(t *testing.T) {
 		msg := tea.KeyPressMsg{Code: tea.KeyPgDown}
 		result, _ := m.dispatchKey(msg)
 		updated := result.(Model)
-		if updated.vp.YOffset() != 0 {
-			t.Errorf("expected task tab pgdown to be a no-op, got offset %d", updated.vp.YOffset())
+		if updated.vp.YOffset() <= 1 {
+			t.Errorf("expected pgdown to scroll archived tasks viewport, got offset %d", updated.vp.YOffset())
+		}
+	})
+
+	t.Run("pgup scrolls archived tasks viewport back up", func(t *testing.T) {
+		m := Model{
+			mode: ModeViewingArchive,
+			tab:  TabTasks,
+		}
+		m.vp = viewport.New(viewport.WithWidth(80), viewport.WithHeight(10))
+		m.vp.SetContent(strings.Repeat("line\n", 100))
+		m.vp.PageDown()
+		m.vp.PageDown()
+		offsetBefore := m.vp.YOffset()
+		msg := tea.KeyPressMsg{Code: tea.KeyPgUp}
+		result, _ := m.dispatchKey(msg)
+		updated := result.(Model)
+		if updated.vp.YOffset() >= offsetBefore {
+			t.Errorf("expected pgup to scroll archived tasks back up, offset before %d, after %d", offsetBefore, updated.vp.YOffset())
 		}
 	})
 }
@@ -687,7 +789,7 @@ func TestRenderCursorOnSectionHeader(t *testing.T) {
 				Cursor: 0,
 			},
 		}
-		content, cursorLine := m.renderTasksContent()
+		content, cursorLine, _ := m.renderTasksContent()
 		if !strings.Contains(content, "▶") {
 			t.Error("expected cursor indicator (▶) in content for section header")
 		}
@@ -707,7 +809,7 @@ func TestRenderCursorOnSectionHeader(t *testing.T) {
 				Cursor: 1,
 			},
 		}
-		content, cursorLine := m.renderTasksContent()
+		content, cursorLine, _ := m.renderTasksContent()
 		if cursorLine == 0 {
 			t.Error("expected non-zero cursor line for task")
 		}

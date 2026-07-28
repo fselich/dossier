@@ -12,7 +12,8 @@ import (
 )
 
 func (m *Model) refreshTasksViewport() {
-	content, cursorLine := m.renderTasksContent()
+	content, cursorLine, itemLines := m.renderTasksContent()
+	m.tasks.ItemLines = itemLines
 	m.vp.SetContent(content)
 	if cursorLine < m.vp.YOffset() {
 		m.vp.SetYOffset(cursorLine)
@@ -51,6 +52,43 @@ func (m *Model) moveCursorUp() {
 	if m.tasks.Cursor > 0 {
 		m.tasks.Cursor--
 	}
+}
+
+func (m *Model) moveCursorPageDown(pageHeight int) {
+	if len(m.tasks.Items) == 0 || len(m.tasks.ItemLines) != len(m.tasks.Items) {
+		return
+	}
+	target := m.tasks.ItemLines[m.tasks.Cursor] + pageHeight
+	newCursor := m.tasks.Cursor
+	for i := m.tasks.Cursor + 1; i < len(m.tasks.Items); i++ {
+		if m.tasks.ItemLines[i] <= target {
+			newCursor = i
+		} else {
+			break
+		}
+	}
+	if newCursor == m.tasks.Cursor {
+		newCursor = len(m.tasks.Items) - 1
+	}
+	m.tasks.Cursor = newCursor
+}
+
+func (m *Model) moveCursorPageUp(pageHeight int) {
+	if len(m.tasks.Items) == 0 || len(m.tasks.ItemLines) != len(m.tasks.Items) {
+		return
+	}
+	target := m.tasks.ItemLines[m.tasks.Cursor] - pageHeight
+	newCursor := m.tasks.Cursor
+	for i := m.tasks.Cursor - 1; i >= 0; i-- {
+		if m.tasks.ItemLines[i] <= target {
+			newCursor = i
+			break
+		}
+	}
+	if newCursor == m.tasks.Cursor {
+		newCursor = 0
+	}
+	m.tasks.Cursor = newCursor
 }
 
 func (m *Model) doToggle() tea.Cmd {
@@ -106,20 +144,23 @@ func (m *Model) inlineMarkdown(s, restore string, done bool) string {
 	return s
 }
 
-func (m *Model) renderTasksContent() (string, int) {
+func (m *Model) renderTasksContent() (string, int, []int) {
 	var sb strings.Builder
 	line, cursorLine := 0, 0
 	contentWidth := m.width - 2
+	itemLines := make([]int, len(m.tasks.Items))
 
 	pendingRestore := extractOpeningEscape(m.theme.Styles.TaskPending)
 	doneRestore := extractOpeningEscape(m.theme.Styles.TaskDone)
 
 	for i, item := range m.tasks.Items {
+		itemLines[i] = line
 		switch item.Kind {
 		case openspec.KindSection:
 			if i > 0 {
 				sb.WriteString("\n")
 				line++
+				itemLines[i] = line
 			}
 			if i == m.tasks.Cursor {
 				cursorLine = line
@@ -165,7 +206,7 @@ func (m *Model) renderTasksContent() (string, int) {
 			line += lipgloss.Height(rendered)
 		}
 	}
-	return sb.String(), cursorLine
+	return sb.String(), cursorLine, itemLines
 }
 
 func sectionProgress(items []openspec.TaskItem, sectionIdx int) (done, total int) {
