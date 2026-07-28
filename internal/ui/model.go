@@ -81,8 +81,9 @@ type specViewerState struct {
 }
 
 type taskState struct {
-	Items  []openspec.TaskItem
-	Cursor int
+	Items     []openspec.TaskItem
+	Cursor    int
+	ItemLines []int
 }
 
 type gitState struct {
