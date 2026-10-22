@@ -3,22 +3,23 @@ package ui
 import tea "charm.land/bubbletea/v2"
 
 func (m Model) updateConfig(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
+	keys := m.effectiveKeyMap().Config
+	switch {
 
-	case "q", "ctrl+c", "i", "esc":
+	case matchesKey(msg, keys.Back):
 		m.mode = m.prevMode
 		return m.commitStateChange()
 
-	case "j", "down":
+	case matchesKey(msg, keys.Down):
 		m.vp.ScrollDown(1)
 
-	case "k", "up":
+	case matchesKey(msg, keys.Up):
 		m.vp.ScrollUp(1)
 
-	case "pgdown":
+	case matchesKey(msg, keys.PageDown):
 		m.vp.PageDown()
 
-	case "pgup":
+	case matchesKey(msg, keys.PageUp):
 		m.vp.PageUp()
 	}
 	return m, nil

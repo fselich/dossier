@@ -4,7 +4,7 @@ import (
 	"strings"
 
 	"charm.land/lipgloss/v2"
-	"github.com/fselich/dossier/internal/git"
+	"github.com/aemonge/dossier/internal/git"
 )
 
 func (m *Model) pollGitStatus() {
@@ -41,7 +41,7 @@ func (m *Model) pollGitStatus() {
 			m.gitState.Cursor = clampGitCursor(m.gitState.Cursor, files)
 		}
 	}
-	if m.tab == TabGit {
+	if m.viewingCode {
 		m.refreshGitViewport()
 	}
 }
@@ -244,19 +244,15 @@ func (m *Model) renderDiffContent() (string, int) {
 	if m.gitState.DiffLines == nil {
 		sb.WriteString("  (no diff available)\n")
 	} else {
-		cs := m.theme.ChromaStyle
-		if cs == "" {
-			cs = "monokai"
-		}
-		addBg := m.theme.DiffAddBg
-		if addBg == "" {
-			addBg = "#1a3a1a"
-		}
-		removeBg := m.theme.DiffRemoveBg
-		if removeBg == "" {
-			removeBg = "#3a1a1a"
-		}
-		content := m.renderDiff(m.gitState.DiffLines, header, m.width-2, m.gitState.ScrollX, cs, addBg, removeBg)
+		content := m.renderDiff(
+			m.gitState.DiffLines,
+			header,
+			m.width-2,
+			m.gitState.ScrollX,
+			m.theme.Chroma,
+			m.theme.DiffAddBg,
+			m.theme.DiffRemoveBg,
+		)
 		sb.WriteString(content)
 	}
 	return sb.String(), 0

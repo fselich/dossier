@@ -2,6 +2,15 @@
 
 # Changelog
 
+## v0.21.3
+
+### Corregido
+- Los cambios que usan esquemas personalizados de OpenSpec cuyos archivos generados difieren de los ID de artefacto (p. ej. `1-idea.md`, `2-plan.md`, … de `ramona-plan`) ya no muestran cada archivo dos veces. Los artefactos enriquecidos por estado ahora reclaman sus archivos de salida, los artefactos descubiertos solo añaden archivos que el esquema no cubrió, y los sobrantes que comparten ID con un artefacto de estado se fusionan en él.
+- El visor de cambios ya no se re-renderiza cada 500 ms: la detección de recargas compara huellas de descubrimiento en lugar de hashear el cambio enriquecido contra una recarga descubierta (un desajuste garantizado que pisaba el estado enriquecido y hacía parpadear el visor en cada tick). Entrar a un cambio y volver al índice también restaura el cursor por ancla cuando las identidades de fila cambiaron mientras tanto.
+- El índice ya no parpadea ni pierde el cursor cuando los archivos cambian con dossier abierto: las recargas de disco reaplican el `openspec status` cacheado de forma síncrona para que las filas declaradas por el esquema nunca vuelvan a los ID de nombres de archivo, y los resultados de estado redundantes no reconstruyen nada.
+- El arranque ejecuta una pasada síncrona de estado acotada (750 ms) antes del primer render, así los ID de artefactos declarados por el esquema aparecen de inmediato en vez de flashear como nombres de archivo un momento después. La pasada usa una única invocación `openspec status --all --json` (un solo proceso para todo el repositorio, arranque ~2× más rápido con varios cambios, constante en vez de lineal con el número de cambios); los CLI sin `--all` recurren a búsquedas por cambio acotadas, y con `openspec` lento o ausente se degrada al comportamiento asíncrono anterior.
+- Las filas de artefactos y las pestañas del visor se rotulan por el archivo concreto en disco: un artefacto que resuelve a un único archivo muestra su nombre sin extensión (p. ej. `1-idea`, `2-plan`, `3-execution`, `4-tasks` de ramona-plan) en vez del ID de esquema pelado, manteniendo visibles los esquemas de numeración personalizados a la vez que se conservan estados enriquecidos, `requires` e identidades de fila estables. El filtrado del índice también coincide con estos rótulos y rutas de salida.
+
 ## v0.20.2
 
 ### Corregido

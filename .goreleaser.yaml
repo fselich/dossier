@@ -41,27 +41,12 @@ checksum:
 
 release:
   github:
-    owner: fselich
+    owner: aemonge
     name: dossier
   name_template: "v{{ .Version }}"
   draft: false
   prerelease: auto
   mode: replace
-
-brews:
-  -
-    name: dossier
-    homepage: https://github.com/fselich/dossier
-    description: "Keyboard-driven TUI for navigating OpenSpec project artifacts"
-    license: MIT
-    repository:
-      owner: fselich
-      name: homebrew-tap
-      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
-    install: |
-      bin.install "dossier"
-    test: |
-      system "#{bin}/dossier", "--help"
 
 snapshot:
   name_template: "{{ incpatch .Version }}-next"

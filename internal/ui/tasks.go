@@ -2,13 +2,14 @@ package ui
 
 import (
 	"fmt"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
-	"github.com/fselich/dossier/internal/openspec"
+	"github.com/aemonge/dossier/internal/openspec"
 )
 
 func (m *Model) refreshTasksViewport() {
@@ -22,13 +23,13 @@ func (m *Model) refreshTasksViewport() {
 }
 
 func (m *Model) loadTaskItems() {
-	ch := m.current()
-	if ch == nil || !ch.Tasks.Present {
+	output, ok := m.selectedTaskOutput()
+	if !ok {
 		m.tasks.Items = nil
 		m.tasks.Cursor = 0
 		return
 	}
-	m.tasks.Items = openspec.ParseTasks(ch.Tasks.Content)
+	m.tasks.Items = openspec.ParseTasks(output.Content)
 	m.tasks.Cursor = m.firstTaskIdx()
 }
 
@@ -54,6 +55,9 @@ func (m *Model) moveCursorUp() {
 }
 
 func (m *Model) doToggle() tea.Cmd {
+	if m.readOnly {
+		return nil
+	}
 	if len(m.tasks.Items) == 0 || m.tasks.Cursor >= len(m.tasks.Items) {
 		return nil
 	}
@@ -61,10 +65,16 @@ func (m *Model) doToggle() tea.Cmd {
 		return nil
 	}
 	ch := m.current()
-	if ch == nil {
+	output, ok := m.selectedTaskOutput()
+	if ch == nil || !ok {
 		return nil
 	}
-	if err := m.loader.ToggleTask(ch.Path+"/tasks.md", m.tasks.Items, m.tasks.Cursor); err != nil {
+	path, safe := safeIndexFile(ch.Path, filepath.Join(ch.Path, filepath.FromSlash(output.RelativePath)))
+	if !safe {
+		m.errMsg = "error: unsafe tasks output path"
+		return tea.Tick(3*time.Second, func(time.Time) tea.Msg { return errClearMsg{} })
+	}
+	if err := m.loader.ToggleTask(path, m.tasks.Items, m.tasks.Cursor); err != nil {
 		m.errMsg = "error: " + err.Error()
 		return tea.Tick(3*time.Second, func(time.Time) tea.Msg { return errClearMsg{} })
 	}

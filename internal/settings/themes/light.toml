@@ -1,0 +1,24 @@
+[theme]
+base = "light"
+
+[theme.ui]
+primary_fg = "0"
+muted_fg = "7"
+mid_fg = "8"
+accent_blue = "4"
+accent_yellow = "3"
+accent_cyan = "6"
+accent_green = "2"
+accent_red = "1"
+accent_magenta = "5"
+active_bg = "4"
+active_fg = "15"
+view_background = "#ffffff"
+diff_add_background = "#e6ffed"
+diff_remove_background = "#ffeef0"
+
+[theme.glamour]
+style = "light"
+
+[theme.chroma]
+style = "github"

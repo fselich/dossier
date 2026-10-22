@@ -1,0 +1,9 @@
+schema: spec
+created: 2026-10-22
+meta:
+  goal: Artifact rows show stable identity and honest status in the change index
+
+status: approved
+created_by: assistant
+
+approved_at: 2026-10-22T14:14:18Z

@@ -1,0 +1,24 @@
+[theme]
+base = "dracula"
+
+[theme.ui]
+primary_fg = "15"
+muted_fg = "8"
+mid_fg = "7"
+accent_blue = "12"
+accent_yellow = "3"
+accent_cyan = "6"
+accent_green = "2"
+accent_red = "9"
+accent_magenta = "5"
+active_bg = "4"
+active_fg = "15"
+view_background = "#282a36"
+diff_add_background = "#1f3425"
+diff_remove_background = "#3d1f26"
+
+[theme.glamour]
+style = "dracula"
+
+[theme.chroma]
+style = "dracula"

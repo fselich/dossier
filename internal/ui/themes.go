@@ -4,7 +4,9 @@ import (
 	"image/color"
 	"strings"
 
+	"charm.land/glamour/v2/ansi"
 	"charm.land/lipgloss/v2"
+	"github.com/alecthomas/chroma/v2"
 )
 
 type ThemeColors struct {
@@ -50,14 +52,16 @@ type ThemeStyles struct {
 }
 
 type Theme struct {
-	Name         string
-	GlamourStyle string
-	ChromaStyle  string
-	ViewBg       color.Color
-	DiffAddBg    string
-	DiffRemoveBg string
-	Colors       ThemeColors
-	Styles       ThemeStyles
+	Name          string
+	GlamourStyle  string
+	GlamourStyles ansi.StyleConfig
+	ChromaStyle   string
+	Chroma        *chroma.Style
+	ViewBg        color.Color
+	DiffAddBg     string
+	DiffRemoveBg  string
+	Colors        ThemeColors
+	Styles        ThemeStyles
 }
 
 func BuildStyles(c ThemeColors) ThemeStyles {
@@ -152,98 +156,24 @@ func BuildStyles(c ThemeColors) ThemeStyles {
 }
 
 var (
-	DarkColors = ThemeColors{
-		PrimaryFg:     lipgloss.Color("15"),
-		MutedFg:       lipgloss.Color("8"),
-		MidFg:         lipgloss.Color("7"),
-		AccentBlue:    lipgloss.Color("12"),
-		AccentYellow:  lipgloss.Color("11"),
-		AccentCyan:    lipgloss.Color("6"),
-		AccentGreen:   lipgloss.Color("2"),
-		AccentRed:     lipgloss.Color("9"),
-		AccentMagenta: lipgloss.Color("5"),
-		ActiveBg:      lipgloss.Color("4"),
-		ActiveFg:      lipgloss.Color("15"),
-	}
+	DarkTheme             = mustBuiltinTheme("dark")
+	NoneTheme             = mustBuiltinTheme("none")
+	LightTheme            = mustBuiltinTheme("light")
+	DraculaTheme          = mustBuiltinTheme("dracula")
+	GruvboxLightSoftTheme = mustBuiltinTheme("gruvbox-light-soft")
 
-	LightColors = ThemeColors{
-		PrimaryFg:     lipgloss.Color("0"),
-		MutedFg:       lipgloss.Color("7"),
-		MidFg:         lipgloss.Color("8"),
-		AccentBlue:    lipgloss.Color("4"),
-		AccentYellow:  lipgloss.Color("3"),
-		AccentCyan:    lipgloss.Color("6"),
-		AccentGreen:   lipgloss.Color("2"),
-		AccentRed:     lipgloss.Color("1"),
-		AccentMagenta: lipgloss.Color("5"),
-		ActiveBg:      lipgloss.Color("4"),
-		ActiveFg:      lipgloss.Color("15"),
-	}
-
-	DraculaColors = ThemeColors{
-		PrimaryFg:     lipgloss.Color("15"),
-		MutedFg:       lipgloss.Color("8"),
-		MidFg:         lipgloss.Color("7"),
-		AccentBlue:    lipgloss.Color("12"),
-		AccentYellow:  lipgloss.Color("3"),
-		AccentCyan:    lipgloss.Color("6"),
-		AccentGreen:   lipgloss.Color("2"),
-		AccentRed:     lipgloss.Color("9"),
-		AccentMagenta: lipgloss.Color("5"),
-		ActiveBg:      lipgloss.Color("4"),
-		ActiveFg:      lipgloss.Color("15"),
-	}
-
-	DarkTheme = Theme{
-		Name:         "dark",
-		GlamourStyle: "dark",
-		ChromaStyle:  "monokai",
-		ViewBg:       color.RGBA{26, 26, 26, 255},
-		DiffAddBg:    "#1a3a1a",
-		DiffRemoveBg: "#3a1a1a",
-		Colors:       DarkColors,
-		Styles:       BuildStyles(DarkColors),
-	}
-
-	NoneTheme = Theme{
-		Name:         "none",
-		GlamourStyle: "dark",
-		ChromaStyle:  "monokai",
-		ViewBg:       nil,
-		DiffAddBg:    "#1a3a1a",
-		DiffRemoveBg: "#3a1a1a",
-		Colors:       DarkColors,
-		Styles:       BuildStyles(DarkColors),
-	}
-
-	LightTheme = Theme{
-		Name:         "light",
-		GlamourStyle: "light",
-		ChromaStyle:  "github",
-		ViewBg:       color.RGBA{255, 255, 255, 255},
-		DiffAddBg:    "#e6ffed",
-		DiffRemoveBg: "#ffeef0",
-		Colors:       LightColors,
-		Styles:       BuildStyles(LightColors),
-	}
-
-	DraculaTheme = Theme{
-		Name:         "dracula",
-		GlamourStyle: "dracula",
-		ChromaStyle:  "dracula",
-		ViewBg:       color.RGBA{40, 42, 54, 255},
-		DiffAddBg:    "#1f3425",
-		DiffRemoveBg: "#3d1f26",
-		Colors:       DraculaColors,
-		Styles:       BuildStyles(DraculaColors),
-	}
+	DarkColors             = DarkTheme.Colors
+	LightColors            = LightTheme.Colors
+	DraculaColors          = DraculaTheme.Colors
+	GruvboxLightSoftColors = GruvboxLightSoftTheme.Colors
 )
 
 var Themes = map[string]Theme{
-	"dark":    DarkTheme,
-	"none":    NoneTheme,
-	"light":   LightTheme,
-	"dracula": DraculaTheme,
+	"dark":               DarkTheme,
+	"none":               NoneTheme,
+	"light":              LightTheme,
+	"dracula":            DraculaTheme,
+	"gruvbox-light-soft": GruvboxLightSoftTheme,
 }
 
 func DefaultTheme() Theme {

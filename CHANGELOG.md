@@ -2,6 +2,15 @@
 
 # Changelog
 
+## v0.21.3
+
+### Fixed
+- Changes using custom OpenSpec schemas whose generated filenames differ from the artifact IDs (e.g. `ramona-plan`'s `1-idea.md`, `2-plan.md`, …) no longer show every artifact file twice. Status-enriched artifacts now claim their output files, discovered fallback artifacts only add files the schema didn't account for, and leftovers sharing a status artifact's ID are merged into it.
+- The index no longer flashes or loses the cursor when artifact files change while dossier is open. Disk reloads re-apply the cached `openspec status` synchronously so schema-declared artifact rows never flap back to filename-stem IDs, redundant status results rebuild nothing, and the cursor follows rows by (change, output file) across ID swaps.
+- The change viewer no longer re-renders every 500 ms tick: reload detection now compares discovery fingerprints instead of hashing the enriched change against a discovered reload (a guaranteed mismatch that stomped the enriched state and flashed the viewport each tick). Entering a change and returning to the index also restores the cursor by anchor when row identities changed while away.
+- Startup runs a bounded (750 ms) synchronous status pass before the first paint, so schema-declared artifact IDs render immediately instead of flashing in as filename stems a moment later. The pass uses a single `openspec status --all --json` invocation (one process spawn for the whole repo, ~2× faster startup on multi-change repos, constant instead of linear in change count); CLIs without `--all` fall back to bounded per-change lookups, and slow or absent `openspec` degrades to the previous async behavior.
+- Artifact rows and viewer tabs are labeled by the concrete output file on disk: an artifact resolving to exactly one file shows its stem (e.g. ramona-plan's `1-idea`, `2-plan`, `3-execution`, `4-tasks`) instead of the bare schema ID, keeping custom numbering schemes visible while enriched statuses, `requires`, and stable row identities are preserved. Index filtering matches these labels and output paths too.
+
 ## v0.20.2
 
 ### Fixed

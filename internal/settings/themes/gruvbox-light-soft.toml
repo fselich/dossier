@@ -1,0 +1,167 @@
+[theme]
+base = "gruvbox-light-soft"
+
+[theme.ui]
+primary_fg = "#3c3836"
+muted_fg = "#928374"
+mid_fg = "#665c54"
+accent_blue = "#076678"
+accent_yellow = "#af3a03"
+accent_cyan = "#427b58"
+accent_green = "#79740e"
+accent_red = "#9d0006"
+accent_magenta = "#8f3f71"
+active_bg = "#d5c4a1"
+active_fg = "#076678"
+view_background = ""
+diff_add_background = "#d9ddbd"
+diff_remove_background = "#eccfc8"
+
+[theme.glamour]
+style = "light"
+
+[theme.glamour.elements.document]
+foreground = "#3c3836"
+
+[theme.glamour.elements.block_quote]
+foreground = "#665c54"
+
+[theme.glamour.elements.text]
+foreground = "#3c3836"
+
+[theme.glamour.elements.heading]
+foreground = "#af3a03"
+
+[theme.glamour.elements.h1]
+foreground = "#af3a03"
+
+[theme.glamour.elements.h2]
+foreground = "#076678"
+
+[theme.glamour.elements.h3]
+foreground = "#8f3f71"
+
+[theme.glamour.elements.h4]
+foreground = "#427b58"
+
+[theme.glamour.elements.h5]
+foreground = "#79740e"
+
+[theme.glamour.elements.h6]
+foreground = "#665c54"
+
+[theme.glamour.elements.strong]
+foreground = "#282828"
+
+[theme.glamour.elements.emph]
+foreground = "#3c3836"
+
+[theme.glamour.elements.link]
+foreground = "#076678"
+
+[theme.glamour.elements.link_text]
+foreground = "#076678"
+
+[theme.glamour.elements.code]
+foreground = "#427b58"
+background = "#ebdbb2"
+
+[theme.glamour.elements.code_block]
+foreground = "#79740e"
+background = "#ebdbb2"
+
+[theme.glamour.elements.table]
+foreground = "#3c3836"
+
+[theme.glamour.elements.horizontal_rule]
+foreground = "#bdae93"
+
+[theme.glamour.syntax.text]
+foreground = "#3c3836"
+[theme.glamour.syntax.error]
+foreground = "#9d0006"
+[theme.glamour.syntax.comment]
+foreground = "#928374"
+[theme.glamour.syntax.comment_preproc]
+foreground = "#8f3f71"
+[theme.glamour.syntax.keyword]
+foreground = "#8f3f71"
+[theme.glamour.syntax.keyword_reserved]
+foreground = "#8f3f71"
+[theme.glamour.syntax.keyword_namespace]
+foreground = "#8f3f71"
+[theme.glamour.syntax.keyword_type]
+foreground = "#427b58"
+[theme.glamour.syntax.operator]
+foreground = "#427b58"
+[theme.glamour.syntax.punctuation]
+foreground = "#3c3836"
+[theme.glamour.syntax.name]
+foreground = "#3c3836"
+[theme.glamour.syntax.name_builtin]
+foreground = "#af3a03"
+[theme.glamour.syntax.name_tag]
+foreground = "#427b58"
+[theme.glamour.syntax.name_attribute]
+foreground = "#076678"
+[theme.glamour.syntax.name_class]
+foreground = "#427b58"
+[theme.glamour.syntax.name_constant]
+foreground = "#8f3f71"
+[theme.glamour.syntax.name_decorator]
+foreground = "#8f3f71"
+[theme.glamour.syntax.name_exception]
+foreground = "#9d0006"
+[theme.glamour.syntax.name_function]
+foreground = "#076678"
+[theme.glamour.syntax.name_other]
+foreground = "#3c3836"
+[theme.glamour.syntax.literal]
+foreground = "#79740e"
+[theme.glamour.syntax.literal_number]
+foreground = "#af3a03"
+[theme.glamour.syntax.literal_date]
+foreground = "#af3a03"
+[theme.glamour.syntax.literal_string]
+foreground = "#79740e"
+[theme.glamour.syntax.literal_string_escape]
+foreground = "#af3a03"
+[theme.glamour.syntax.generic_deleted]
+foreground = "#9d0006"
+[theme.glamour.syntax.generic_emph]
+foreground = "#3c3836"
+[theme.glamour.syntax.generic_inserted]
+foreground = "#79740e"
+[theme.glamour.syntax.generic_strong]
+foreground = "#282828"
+[theme.glamour.syntax.generic_subheading]
+foreground = "#af3a03"
+[theme.glamour.syntax.background]
+background = "#ebdbb2"
+
+[theme.chroma]
+style = "github"
+
+[theme.chroma.tokens]
+Background = "bg:#f2e5bc"
+Text = "#3c3836"
+Error = "bold #9d0006"
+Comment = "italic #928374"
+CommentPreproc = "#8f3f71"
+Keyword = "bold #8f3f71"
+KeywordType = "#427b58"
+Name = "#3c3836"
+NameAttribute = "#9d0006"
+NameBuiltin = "#af3a03"
+NameClass = "#427b58"
+NameConstant = "#8f3f71"
+NameFunction = "bold #076678"
+NameTag = "#427b58"
+Literal = "#79740e"
+LiteralNumber = "#af3a03"
+LiteralString = "italic #79740e"
+LiteralStringEscape = "#af3a03"
+Operator = "#427b58"
+Punctuation = "#3c3836"
+GenericDeleted = "#9d0006"
+GenericInserted = "#79740e"

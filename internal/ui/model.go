@@ -1,15 +1,16 @@
 package ui
 
 import (
-	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/glamour/v2"
-	"github.com/fselich/dossier/internal/git"
-	"github.com/fselich/dossier/internal/openspec"
+	"github.com/aemonge/dossier/internal/git"
+	"github.com/aemonge/dossier/internal/openspec"
+	"github.com/aemonge/dossier/internal/settings"
 )
 
 type Mode int
@@ -22,26 +23,11 @@ const (
 	ModeViewingConfig
 )
 
-type Tab int
-
-const (
-	TabProposal Tab = iota
-	TabDesign
-	TabSpecs
-	TabTasks
-	TabGit
-	tabCount
-)
-
-var tabLabels = [tabCount]string{"proposal", "design", "specs", "tasks", "code"}
-
 type errClearMsg struct{}
-type editorReturnMsg struct{}
-
-// renderedMsg carries async glamour output back to the event loop.
-type renderedMsg struct {
-	tab     Tab
-	content string
+type indexStatusClearMsg string
+type editorReturnMsg struct {
+	indexIdentity    string
+	artifactIdentity artifactOutputIdentity
 }
 
 // specRenderedMsg carries async glamour output for ModeViewingSpec.
@@ -57,10 +43,57 @@ type renderedConfigMsg struct {
 
 type tickMsg time.Time
 
+type indexActionMode int
+
+const (
+	indexActionIdle indexActionMode = iota
+	indexActionSchema
+	indexActionName
+	indexActionConfirmArchive
+	indexActionConfirmReactivate
+	indexActionConfirmUndo
+	indexActionPending
+)
+
+type indexOperation int
+
+const (
+	indexOperationNone indexOperation = iota
+	indexOperationCreate
+	indexOperationValidate
+	indexOperationArchive
+	indexOperationReactivate
+	indexOperationUndo
+)
+
+type indexActionState struct {
+	Mode           indexActionMode
+	Operation      indexOperation
+	Schema         string
+	SchemaCursor   int
+	SchemaFilter   string
+	Name           string
+	TargetIdentity string
+	Status         string
+	StatusError    bool
+}
+
+type indexActionResultMsg struct {
+	Kind           indexOperation
+	Name           string
+	TargetIdentity string
+	Validation     openspec.ValidationResult
+	Archive        openspec.ArchiveResult
+	Undo           *openspec.LifecycleUndo
+	Err            error
+}
+
 type indexState struct {
 	Items             []indexItem
 	Cursor            int
 	ExpandedSpecs     map[int]bool
+	ExpandedChanges   map[string]bool
+	ExpandedArtifacts map[string]bool
 	CollapsedSections [3]bool
 	SortBySuffix      bool
 	Order             []int
@@ -71,6 +104,7 @@ type indexState struct {
 	FilterActive   bool
 	FilterIndices  []int
 	PrevFilterText string
+	Action         indexActionState
 }
 
 type specViewerState struct {
@@ -100,6 +134,8 @@ type indexItemKind int
 const (
 	indexKindActive indexItemKind = iota
 	indexKindArchived
+	indexKindArtifact
+	indexKindArtifactOutput
 	indexKindSpec
 	indexKindRequirement
 	indexKindSection
@@ -112,35 +148,51 @@ const (
 )
 
 var sectionNames = []string{
-	sectionActive:   "Active Changes",
-	sectionSpecs:    "Specifications",
-	sectionArchived: "Archived Changes",
+	sectionActive:   "Active Work",
+	sectionSpecs:    "Canonical Specs",
+	sectionArchived: "History",
 }
 
 type indexItem struct {
-	kind   indexItemKind
-	idx    int // into project.Changes (active), archiveChanges (archived), projectSpecs (spec/requirement), or section (section)
-	reqIdx int // index into projectSpecs[idx].RequirementNames; only used for indexKindRequirement
+	kind        indexItemKind
+	idx         int // change, archive, project spec, or section index
+	artifactIdx int
+	outputIdx   int
+	reqIdx      int
+	archived    bool
+	identity    string
+	depth       int
 }
 
 type Model struct {
 	root   string
 	loader *openspec.Loader
 
-	project   *openspec.Project
-	changeIdx int
-	tab       Tab
+	project           *openspec.Project
+	changeIdx         int
+	artifactSelection artifactSelection
+	viewingCode       bool
+
+	openSpec              openSpecClient
+	lifecycle             *openspec.LifecycleService
+	lifecycleUndo         *openspec.LifecycleUndo
+	schemaCatalog         []openspec.SchemaInfo
+	schemaCatalogErr      string
+	discoveryFingerprints map[string]string
+	enrichedFingerprints  map[string]string
+	pendingEnrichments    map[string]string
+	enrichmentRetryAfter  map[string]time.Time
+	lastStatusByName      map[string]openspec.ChangeStatus
 
 	vp      viewport.Model
 	vpReady bool
 
 	tasks taskState
 
-	specIdx int
-
 	errMsg     string
 	loading    bool
 	singlePath bool
+	readOnly   bool
 
 	isGitRepo bool
 	gitRoot   string
@@ -148,28 +200,49 @@ type Model struct {
 
 	width, height int
 
-	renderCache     map[Tab]string
-	glamourRenderer *glamour.TermRenderer
-	lastRenderWidth int
+	artifactRenderCache map[artifactOutputIdentity]string
+	glamourRenderer     *glamour.TermRenderer
+	lastRenderWidth     int
 
-	mode          Mode
-	prevMode      Mode
-	index         indexState
-	projectSpecs  []openspec.ProjectSpec
-	specViewer    specViewerState
-	projectConfig openspec.ProjectConfig
-	theme         Theme
+	mode                Mode
+	prevMode            Mode
+	returnIndexIdentity string
+	returnIndexAnchor   cursorAnchor
+	index               indexState
+	projectSpecs        []openspec.ProjectSpec
+	specViewer          specViewerState
+	projectConfig       openspec.ProjectConfig
+	theme               Theme
+	keyMap              settings.KeyConfig
 }
 
-func New(project *openspec.Project, cfg openspec.ProjectConfig, root string, loader *openspec.Loader, theme Theme) Model {
+func New(project *openspec.Project, cfg openspec.ProjectConfig, root string, loader *openspec.Loader, theme Theme, keyMap settings.KeyConfig, readOnly bool) Model {
+	return NewWithStartView(project, cfg, root, loader, theme, keyMap, readOnly, "index")
+}
+
+func NewWithStartView(project *openspec.Project, cfg openspec.ProjectConfig, root string, loader *openspec.Loader, theme Theme, keyMap settings.KeyConfig, readOnly bool, startView string) Model {
+	return newModel(project, cfg, root, loader, theme, keyMap, readOnly, startView, false)
+}
+
+func newModel(project *openspec.Project, cfg openspec.ProjectConfig, root string, loader *openspec.Loader, theme Theme, keyMap settings.KeyConfig, readOnly bool, startView string, singlePath bool) Model {
 	m := Model{
-		root:          root,
-		loader:        loader,
-		project:       project,
-		renderCache:   make(map[Tab]string),
-		projectConfig: cfg,
-		theme:         theme,
-		isGitRepo:     git.IsInsideWorkTree(root),
+		root:                  root,
+		loader:                loader,
+		project:               project,
+		openSpec:              openspec.NewOSCLI(),
+		lifecycle:             openspec.NewLifecycleService(root, openspec.NewOSCLI()),
+		discoveryFingerprints: discoveryFingerprints(project.Changes),
+		enrichedFingerprints:  make(map[string]string),
+		pendingEnrichments:    make(map[string]string),
+		enrichmentRetryAfter:  make(map[string]time.Time),
+		lastStatusByName:      make(map[string]openspec.ChangeStatus),
+		artifactRenderCache:   make(map[artifactOutputIdentity]string),
+		projectConfig:         cfg,
+		theme:                 theme,
+		keyMap:                keyMap,
+		readOnly:              readOnly,
+		singlePath:            singlePath,
+		isGitRepo:             git.IsInsideWorkTree(root),
 	}
 	if m.isGitRepo {
 		if r, err := git.WorkTreeRoot(root); err == nil {
@@ -179,10 +252,14 @@ func New(project *openspec.Project, cfg openspec.ProjectConfig, root string, loa
 		}
 	}
 	m.pollGitStatus()
+	// First paint must already be schema-aware: a bounded synchronous
+	// status pass prevents the discovered→enriched identity swap flash.
+	m.bootstrapEnrichment()
 	if len(project.Changes) > 0 {
-		m.tab = m.defaultTab()
+		m.selectDefaultArtifact()
 		m.loadTaskItems()
-	} else {
+	}
+	if !singlePath && (startView == "index" || len(project.Changes) == 0) {
 		var archiveErr error
 		m.index.ArchiveChanges, archiveErr = loader.ListArchiveChangesFrom(root)
 		if archiveErr != nil {
@@ -200,14 +277,112 @@ func New(project *openspec.Project, cfg openspec.ProjectConfig, root string, loa
 	return m
 }
 
-func NewSinglePath(project *openspec.Project, cfg openspec.ProjectConfig, root string, loader *openspec.Loader, theme Theme) Model {
-	m := New(project, cfg, root, loader, theme)
-	m.singlePath = true
+const bootstrapEnrichmentBudget = 750 * time.Millisecond
+
+// batchStatusClient is implemented by clients that can fetch every change's
+// status in one CLI invocation. Production models use *openspec.CLI; test
+// stubs may omit it and fall back to bounded per-change lookups.
+type batchStatusClient interface {
+	StatusAll(root string) ([]openspec.ChangeStatus, error)
+}
+
+// bootstrapEnrichment runs one bounded synchronous status pass before the
+// first paint so the hierarchy never renders discovered (filename-stem)
+// artifact IDs that swap for schema-declared ones moments later. Changes
+// that miss the budget (slow or absent CLI) degrade to the async enrichment
+// path exactly as before.
+func (m *Model) bootstrapEnrichment() {
+	if m.openSpec == nil || m.project == nil || len(m.project.Changes) == 0 {
+		return
+	}
+	collected := m.collectBootstrapStatuses()
+	for i := range m.project.Changes {
+		status, ok := collected[m.project.Changes[i].Name]
+		if !ok {
+			continue
+		}
+		discovered := changeDiscoveryFingerprint(m.project.Changes[i])
+		enriched := m.loader.EnrichChange(m.project.Changes[i], status)
+		m.lastStatusByName[m.project.Changes[i].Name] = status
+		m.enrichedFingerprints[m.project.Changes[i].Name] = discovered
+		if changeDiscoveryFingerprint(enriched) != discovered {
+			m.project.Changes[i] = enriched
+		}
+	}
+}
+
+func (m *Model) collectBootstrapStatuses() map[string]openspec.ChangeStatus {
+	done := make(chan map[string]openspec.ChangeStatus, 1)
+	go func() {
+		done <- m.runBootstrapStatusPass()
+	}()
+	select {
+	case statuses := <-done:
+		return statuses
+	case <-time.After(bootstrapEnrichmentBudget):
+		// Stragglers finish into the buffered channel; missing changes
+		// degrade to the async enrichment path.
+		return nil
+	}
+}
+
+func (m *Model) runBootstrapStatusPass() map[string]openspec.ChangeStatus {
+	// Preferred: one `openspec status --all` invocation — a single process
+	// spawn where per-change lookups would pay CLI startup once per change.
+	if batch, ok := m.openSpec.(batchStatusClient); ok {
+		if statuses, err := batch.StatusAll(m.root); err == nil {
+			byName := make(map[string]openspec.ChangeStatus, len(statuses))
+			for _, status := range statuses {
+				byName[status.ChangeName] = status
+			}
+			return byName
+		}
+	}
+	// Fallback for clients without batch support: bounded per-change calls.
+	byName := make(map[string]openspec.ChangeStatus)
+	var mu sync.Mutex
+	jobs := make(chan int)
+	workers := min(maxConcurrentStatus, len(m.project.Changes))
+	var wg sync.WaitGroup
+	wg.Add(workers)
+	for range workers {
+		go func() {
+			defer wg.Done()
+			for i := range jobs {
+				change := m.project.Changes[i]
+				status, err := m.openSpec.Status(m.root, change.Name)
+				if err == nil {
+					mu.Lock()
+					byName[change.Name] = status
+					mu.Unlock()
+				}
+			}
+		}()
+	}
+	for i := range m.project.Changes {
+		jobs <- i
+	}
+	close(jobs)
+	wg.Wait()
+	return byName
+}
+
+func NewSinglePath(project *openspec.Project, cfg openspec.ProjectConfig, root string, loader *openspec.Loader, theme Theme, keyMap settings.KeyConfig, readOnly bool) Model {
+	m := newModel(project, cfg, root, loader, theme, keyMap, readOnly, "change", true)
+	if filepath.Base(filepath.Dir(filepath.Clean(root))) == "archive" && len(project.Changes) > 0 {
+		m.index.ArchiveChanges = append([]openspec.Change(nil), project.Changes...)
+		m.index.ArchiveCursor = 0
+		m.mode = ModeViewingArchive
+		m.selectDefaultArtifact()
+	}
 	return m
 }
 
 func (m Model) Init() tea.Cmd {
-	return tea.Tick(500*time.Millisecond, func(t time.Time) tea.Msg { return tickMsg(t) })
+	return tea.Batch(
+		tea.Tick(500*time.Millisecond, func(t time.Time) tea.Msg { return tickMsg(t) }),
+		func() tea.Msg { return startEnrichmentMsg{} },
+	)
 }
 
 func (m Model) View() tea.View {
@@ -248,100 +423,6 @@ func (m *Model) current() *openspec.Change {
 	return &m.project.Changes[m.changeIdx]
 }
 
-func firstAvailableTab(ch openspec.Change) Tab {
-	if ch.Proposal.Present {
-		return TabProposal
-	}
-	if ch.Design.Present {
-		return TabDesign
-	}
-	if ch.Specs.Present {
-		return TabSpecs
-	}
-	if ch.Tasks.Present {
-		return TabTasks
-	}
-	return TabProposal
-}
-
-func (m *Model) tabAvailable(t Tab) bool {
-	ch := m.current()
-	if ch == nil {
-		return false
-	}
-	switch t {
-	case TabProposal:
-		return ch.Proposal.Present
-	case TabDesign:
-		return ch.Design.Present
-	case TabTasks:
-		return ch.Tasks.Present
-	case TabSpecs:
-		return ch.Specs.Present
-	case TabGit:
-		return m.isGitRepo && m.mode == ModeNormal && len(m.gitState.Files) > 0
-	}
-	return false
-}
-
-func (m *Model) defaultTab() Tab {
-	for t := Tab(0); t < tabCount; t++ {
-		if m.tabAvailable(t) {
-			return t
-		}
-	}
-	return TabProposal
-}
-
-func (m *Model) nextAvailableTab(current Tab, delta int) Tab {
-	next := current
-	for range int(tabCount) {
-		next = Tab((int(next) + delta + int(tabCount)) % int(tabCount))
-		if m.tabAvailable(next) {
-			return next
-		}
-	}
-	return current
-}
-
-func (m *Model) artifactPath() string {
-	ch := m.current()
-	if ch == nil {
-		return ""
-	}
-	switch m.tab {
-	case TabProposal:
-		return filepath.Join(ch.Path, "proposal.md")
-	case TabDesign:
-		return filepath.Join(ch.Path, "design.md")
-	case TabTasks:
-		return filepath.Join(ch.Path, "tasks.md")
-	case TabSpecs:
-		if m.specIdx < len(ch.SpecFiles) {
-			specsDir := filepath.Join(ch.Path, "specs")
-			entries, err := os.ReadDir(specsDir)
-			if err != nil {
-				return ""
-			}
-			dirIdx := 0
-			for _, e := range entries {
-				if !e.IsDir() {
-					continue
-				}
-				if dirIdx == m.specIdx {
-					p := filepath.Join(specsDir, e.Name(), "spec.md")
-					if _, err := os.Stat(p); err == nil {
-						return p
-					}
-					return ""
-				}
-				dirIdx++
-			}
-		}
-	}
-	return ""
-}
-
 func (m *Model) currentArchive() *openspec.Change {
 	if m.index.ArchiveCursor < len(m.index.ArchiveChanges) {
 		return &m.index.ArchiveChanges[m.index.ArchiveCursor]
@@ -377,44 +458,49 @@ func (m *Model) contentHeight() int {
 	return h
 }
 
-// mergeReloadedChange updates in-memory state from a freshly reloaded Change
-// and returns which artifacts changed. It does not handle cursor preservation
-// or viewport refresh — the caller handles those.
+// mergeReloadedChange updates the selected active change from dynamic artifact
+// outputs while preserving the selected artifact/output identity when possible.
 func (m *Model) mergeReloadedChange(fresh openspec.Change) (tasksChanged bool, viewportDirty bool) {
 	ch := m.current()
-	if ch == nil {
+	if ch == nil || m.mode != ModeNormal || m.changeIdx < 0 || m.changeIdx >= len(m.project.Changes) {
 		return false, false
 	}
-
-	if fresh.Tasks.Present != ch.Tasks.Present || fresh.Tasks.Content != ch.Tasks.Content {
-		m.project.Changes[m.changeIdx].Tasks = fresh.Tasks
-		m.tasks.Items = openspec.ParseTasks(fresh.Tasks.Content)
-		tasksChanged = true
+	// Disk-change detection must compare DISCOVERY fingerprints: the current
+	// change is enriched, so hashing it directly never matches a discovered
+	// reload — that mismatch re-stomped the enriched state and re-rendered
+	// the viewport on every 500 ms tick.
+	oldFingerprint := m.discoveryFingerprints[ch.Name]
+	if oldFingerprint == "" {
+		oldFingerprint = changeDiscoveryFingerprint(*ch)
 	}
-	if fresh.Proposal.Present != ch.Proposal.Present || fresh.Proposal.Content != ch.Proposal.Content {
-		m.project.Changes[m.changeIdx].Proposal = fresh.Proposal
-		delete(m.renderCache, TabProposal)
-		if m.tab == TabProposal {
-			viewportDirty = true
-		}
+	newFingerprint := changeDiscoveryFingerprint(fresh)
+	if oldFingerprint == newFingerprint {
+		return false, false
 	}
-	if fresh.Design.Present != ch.Design.Present || fresh.Design.Content != ch.Design.Content {
-		m.project.Changes[m.changeIdx].Design = fresh.Design
-		delete(m.renderCache, TabDesign)
-		if m.tab == TabDesign {
-			viewportDirty = true
-		}
+	_, oldTasks, _ := artifactOutputByID(ch, "tasks")
+	oldTaskContent := ""
+	if oldTasks != nil {
+		oldTaskContent = oldTasks.Content
 	}
-	if fresh.Specs.Present != ch.Specs.Present || fresh.Specs.Content != ch.Specs.Content {
-		m.project.Changes[m.changeIdx].Specs = fresh.Specs
-		m.project.Changes[m.changeIdx].SpecFiles = fresh.SpecFiles
-		if m.specIdx >= len(fresh.SpecFiles) {
-			m.specIdx = 0
-		}
-		delete(m.renderCache, TabSpecs)
-		if m.tab == TabSpecs {
-			viewportDirty = true
-		}
+	selectedBefore := m.artifactSelection
+	oldArtifactIndex, oldOutputIndex := artifactSelectionPosition(ch, selectedBefore)
+	// Adoption is the single writer: it re-applies the cached status so the
+	// change never passes through the discovered-ID intermediate state.
+	if !m.adoptDiscoveredChange(m.changeIdx, fresh) {
+		m.project.Changes[m.changeIdx] = fresh
 	}
-	return
+	adopted := m.project.Changes[m.changeIdx]
+	_, newTasks, _ := artifactOutputByID(&adopted, "tasks")
+	newTaskContent := ""
+	if newTasks != nil {
+		newTaskContent = newTasks.Content
+	}
+	tasksChanged = oldTaskContent != newTaskContent
+	m.invalidateArtifactRenderCache(adopted.Name)
+	m.reconcileArtifactSelectionNear(oldArtifactIndex, oldOutputIndex)
+	viewportDirty = !m.viewingCode && (selectedBefore != m.artifactSelection || oldFingerprint != newFingerprint)
+	if tasksChanged {
+		m.tasks.Items = openspec.ParseTasks(newTaskContent)
+	}
+	return tasksChanged, viewportDirty
 }

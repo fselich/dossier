@@ -9,10 +9,10 @@ import (
 	"sync"
 
 	"charm.land/lipgloss/v2"
+	"github.com/aemonge/dossier/internal/git"
 	"github.com/alecthomas/chroma/v2"
 	"github.com/alecthomas/chroma/v2/lexers"
 	"github.com/alecthomas/chroma/v2/styles"
-	"github.com/fselich/dossier/internal/git"
 )
 
 type DiffLineType int
@@ -65,11 +65,13 @@ func getLexer(filename string) chroma.Lexer {
 	return lexer
 }
 
-func highlightLine(content, filename, bgColor, chromaStyleName string) string {
+func highlightLine(content, filename, bgColor string, chromaStyle *chroma.Style) string {
 	if content == "" {
 		return ""
 	}
-	cs := getChromaStyle(chromaStyleName)
+	if chromaStyle == nil {
+		chromaStyle = styles.Fallback
+	}
 	lexer := getLexer(filename)
 	iterator, err := lexer.Tokenise(nil, content)
 	if err != nil {
@@ -77,13 +79,18 @@ func highlightLine(content, filename, bgColor, chromaStyleName string) string {
 	}
 	var b strings.Builder
 	for _, token := range iterator.Tokens() {
-		entry := cs.Get(token.Type)
-		style := lipgloss.NewStyle()
+		entry := chromaStyle.Get(token.Type)
+		style := lipgloss.NewStyle().
+			Bold(entry.Bold == chroma.Yes).
+			Italic(entry.Italic == chroma.Yes).
+			Underline(entry.Underline == chroma.Yes)
 		if entry.Colour.IsSet() {
 			style = style.Foreground(lipgloss.Color(entry.Colour.String()))
 		}
 		if bgColor != "" {
 			style = style.Background(lipgloss.Color(bgColor))
+		} else if entry.Background.IsSet() {
+			style = style.Background(lipgloss.Color(entry.Background.String()))
 		}
 		b.WriteString(style.Render(token.Value))
 	}
@@ -175,7 +182,7 @@ func fmtLineNum(n int) string {
 
 const lineNumWidth = 4
 
-func (m *Model) renderDiff(lines []DiffLine, filename string, width int, scrollX int, chromaStyleName string, addBgColor, removeBgColor string) string {
+func (m *Model) renderDiff(lines []DiffLine, filename string, width int, scrollX int, chromaStyle *chroma.Style, addBgColor, removeBgColor string) string {
 	if len(lines) == 0 {
 		return m.theme.Styles.Help.Render("  (no diff available)")
 	}
@@ -194,7 +201,7 @@ func (m *Model) renderDiff(lines []DiffLine, filename string, width int, scrollX
 			nums := m.theme.Styles.GitAdded.Render(oldNum + " " + newNum)
 			content := scrollContent(dl.Content, scrollX)
 			indicator := m.theme.Styles.GitAdded.Render("+ ")
-			highlighted := highlightLine(content, filename, addBgColor, chromaStyleName)
+			highlighted := highlightLine(content, filename, addBgColor, chromaStyle)
 			line := nums + " " + indicator + highlighted
 			line = padLine(line, codeWidth+lineNumWidth*2+3, addBgColor)
 			sb.WriteString(" " + line + "\n")
@@ -204,7 +211,7 @@ func (m *Model) renderDiff(lines []DiffLine, filename string, width int, scrollX
 			nums := m.theme.Styles.DiffRemoved.Render(oldNum + " " + newNum)
 			content := scrollContent(dl.Content, scrollX)
 			indicator := m.theme.Styles.DiffRemoved.Render("- ")
-			highlighted := highlightLine(content, filename, removeBgColor, chromaStyleName)
+			highlighted := highlightLine(content, filename, removeBgColor, chromaStyle)
 			line := nums + " " + indicator + highlighted
 			line = padLine(line, codeWidth+lineNumWidth*2+3, removeBgColor)
 			sb.WriteString(" " + line + "\n")
@@ -213,7 +220,7 @@ func (m *Model) renderDiff(lines []DiffLine, filename string, width int, scrollX
 			newNum := fmtLineNum(dl.NewNum)
 			nums := m.theme.Styles.Help.Render(oldNum + " " + newNum)
 			content := scrollContent(dl.Content, scrollX)
-			highlighted := highlightLine(content, filename, "", chromaStyleName)
+			highlighted := highlightLine(content, filename, "", chromaStyle)
 			line := nums + "  " + highlighted
 			sb.WriteString(" " + line + "\n")
 		}

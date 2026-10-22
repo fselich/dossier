@@ -6,7 +6,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/glamour/v2"
-	"github.com/fselich/dossier/internal/openspec"
+	"github.com/aemonge/dossier/internal/openspec"
 )
 
 func (m *Model) loadViewport() tea.Cmd {
@@ -20,9 +20,9 @@ func (m *Model) loadViewport() tea.Cmd {
 		return m.loadViewportForConfig()
 	case m.mode == ModeViewingSpec:
 		return m.loadViewportForSpec()
-	case m.tab == TabTasks && m.mode == ModeNormal:
+	case m.mode == ModeNormal && m.isTasksView() && m.artifactSelection.OutputPath != "":
 		return m.loadViewportForTasks()
-	case m.tab == TabGit && m.mode == ModeNormal:
+	case m.viewingCode && m.mode == ModeNormal:
 		return m.loadViewportForGit()
 	default:
 		return m.loadViewportForArtifact()
@@ -33,14 +33,13 @@ func (m *Model) ensureRenderer(width int) {
 	if m.glamourRenderer != nil && m.lastRenderWidth == width {
 		return
 	}
-	style := m.theme.GlamourStyle
-	if style == "" {
-		style = "dark"
+	options := []glamour.TermRendererOption{glamour.WithWordWrap(width)}
+	if m.theme.GlamourStyle == "" {
+		options = append(options, glamour.WithStandardStyle("dark"))
+	} else {
+		options = append(options, glamour.WithStyles(m.theme.GlamourStyles))
 	}
-	r, err := glamour.NewTermRenderer(
-		glamour.WithStandardStyle(style),
-		glamour.WithWordWrap(width),
-	)
+	r, err := glamour.NewTermRenderer(options...)
 	if err != nil {
 		m.glamourRenderer = nil
 		return
@@ -144,52 +143,38 @@ func (m *Model) loadViewportForGit() tea.Cmd {
 }
 
 func (m *Model) loadViewportForArtifact() tea.Cmd {
-	if cached, ok := m.renderCache[m.tab]; ok {
-		m.vp.SetContent(cached)
-		return nil
-	}
-
-	ch := m.current()
-	if ch == nil {
+	if key, ok := m.selectedArtifactKey(); ok {
+		if cached, cachedOK := m.artifactRenderCache[key]; cachedOK {
+			m.vp.SetContent(cached)
+			return nil
+		}
+		artifact, output, _ := m.selectedArtifactOutput()
+		raw := artifactStatusView(artifact)
+		if output != nil {
+			raw = output.Content
+		}
+		if raw == "" {
+			m.vp.SetContent("  (artifact not available)")
+			return nil
+		}
+		m.loading = true
 		m.vp.SetContent("")
-		return nil
-	}
-	var raw string
-	switch m.tab {
-	case TabProposal:
-		raw = ch.Proposal.Content
-	case TabDesign:
-		raw = ch.Design.Content
-	case TabSpecs:
-		if m.specIdx < len(ch.SpecFiles) {
-			raw = ch.SpecFiles[m.specIdx].Content
+		width := m.renderWidth()
+		m.ensureRenderer(width)
+		if m.glamourRenderer == nil {
+			return func() tea.Msg { return artifactRenderedMsg{key: key, content: raw} }
 		}
-	case TabTasks:
-		raw = ch.Tasks.Content
-	}
-	if raw == "" {
-		m.vp.SetContent("  (artifact not available)")
-		return nil
-	}
-
-	m.loading = true
-	m.vp.SetContent("")
-
-	tab := m.tab
-	width := m.renderWidth()
-	m.ensureRenderer(width)
-	if m.glamourRenderer == nil {
 		return func() tea.Msg {
-			return renderedMsg{tab: tab, content: raw}
+			out, err := m.glamourRenderer.Render(raw)
+			if err != nil {
+				return artifactRenderedMsg{key: key, content: raw}
+			}
+			return artifactRenderedMsg{key: key, content: out}
 		}
 	}
-	return func() tea.Msg {
-		out, err := m.glamourRenderer.Render(raw)
-		if err != nil {
-			return renderedMsg{tab: tab, content: raw}
-		}
-		return renderedMsg{tab: tab, content: out}
-	}
+
+	m.vp.SetContent("  (artifact not available)")
+	return nil
 }
 
 func (m *Model) renderWidth() int {

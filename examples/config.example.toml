@@ -1,0 +1,286 @@
+# Dossier configuration
+# Default path: ${XDG_CONFIG_HOME:-~/.config}/dossier/config.toml
+# Every section is optional. Unspecified values inherit from the selected base.
+
+[ui]
+start_view = "index" # index (default) or change; explicit path launches bypass this
+
+[theme]
+base = "light" # none, dark, light, dracula, gruvbox-light-soft
+
+# Every Dossier-owned color role. Values accept #RRGGBB or ANSI colors 0-255.
+[theme.ui]
+primary_fg = "0"
+muted_fg = "8"
+mid_fg = "8"
+accent_blue = "4"
+accent_yellow = "3"
+accent_cyan = "6"
+accent_green = "2"
+accent_red = "1"
+accent_magenta = "5"
+active_bg = "4"
+active_fg = "15"
+view_background = "#ffffff"
+diff_add_background = "#e6ffed"
+diff_remove_background = "#ffeef0"
+
+# Glamour Markdown starts from a built-in style. Any element below may override
+# foreground and/or background. Supported element names are listed here.
+[theme.glamour]
+style = "light" # ascii, dark, light, pink, dracula, tokyo-night
+
+[theme.glamour.elements.document]
+foreground = "#24292f"
+background = "#ffffff"
+
+[theme.glamour.elements.block_quote]
+foreground = "#57606a"
+
+[theme.glamour.elements.paragraph]
+foreground = "#24292f"
+
+[theme.glamour.elements.list]
+foreground = "#24292f"
+
+[theme.glamour.elements.heading]
+foreground = "#0969da"
+
+[theme.glamour.elements.h1]
+foreground = "#0550ae"
+
+[theme.glamour.elements.h2]
+foreground = "#0550ae"
+
+[theme.glamour.elements.h3]
+foreground = "#0969da"
+
+[theme.glamour.elements.h4]
+foreground = "#0969da"
+
+[theme.glamour.elements.h5]
+foreground = "#0969da"
+
+[theme.glamour.elements.h6]
+foreground = "#57606a"
+
+[theme.glamour.elements.text]
+foreground = "#24292f"
+
+[theme.glamour.elements.strikethrough]
+foreground = "#57606a"
+
+[theme.glamour.elements.emph]
+foreground = "#24292f"
+
+[theme.glamour.elements.strong]
+foreground = "#24292f"
+
+[theme.glamour.elements.horizontal_rule]
+foreground = "#d0d7de"
+
+[theme.glamour.elements.item]
+foreground = "#24292f"
+
+[theme.glamour.elements.enumeration]
+foreground = "#0969da"
+
+[theme.glamour.elements.task]
+foreground = "#24292f"
+
+[theme.glamour.elements.link]
+foreground = "#0969da"
+
+[theme.glamour.elements.link_text]
+foreground = "#0969da"
+
+[theme.glamour.elements.image]
+foreground = "#8250df"
+
+[theme.glamour.elements.image_text]
+foreground = "#8250df"
+
+[theme.glamour.elements.code]
+foreground = "#cf222e"
+background = "#f6f8fa"
+
+[theme.glamour.elements.code_block]
+foreground = "#24292f"
+background = "#f6f8fa"
+
+[theme.glamour.elements.table]
+foreground = "#24292f"
+
+[theme.glamour.elements.definition_list]
+foreground = "#24292f"
+
+[theme.glamour.elements.definition_term]
+foreground = "#0550ae"
+
+[theme.glamour.elements.definition_description]
+foreground = "#24292f"
+
+[theme.glamour.elements.html_block]
+foreground = "#57606a"
+
+[theme.glamour.elements.html_span]
+foreground = "#57606a"
+
+# Glamour code-block syntax categories. These are independent from the Chroma
+# settings used by Dossier's Git diff renderer.
+[theme.glamour.syntax.text]
+foreground = "#24292f"
+[theme.glamour.syntax.error]
+foreground = "#cf222e"
+[theme.glamour.syntax.comment]
+foreground = "#6e7781"
+[theme.glamour.syntax.comment_preproc]
+foreground = "#8250df"
+[theme.glamour.syntax.keyword]
+foreground = "#cf222e"
+[theme.glamour.syntax.keyword_reserved]
+foreground = "#cf222e"
+[theme.glamour.syntax.keyword_namespace]
+foreground = "#cf222e"
+[theme.glamour.syntax.keyword_type]
+foreground = "#953800"
+[theme.glamour.syntax.operator]
+foreground = "#0550ae"
+[theme.glamour.syntax.punctuation]
+foreground = "#24292f"
+[theme.glamour.syntax.name]
+foreground = "#24292f"
+[theme.glamour.syntax.name_builtin]
+foreground = "#953800"
+[theme.glamour.syntax.name_tag]
+foreground = "#116329"
+[theme.glamour.syntax.name_attribute]
+foreground = "#0550ae"
+[theme.glamour.syntax.name_class]
+foreground = "#953800"
+[theme.glamour.syntax.name_constant]
+foreground = "#0550ae"
+[theme.glamour.syntax.name_decorator]
+foreground = "#8250df"
+[theme.glamour.syntax.name_exception]
+foreground = "#cf222e"
+[theme.glamour.syntax.name_function]
+foreground = "#8250df"
+[theme.glamour.syntax.name_other]
+foreground = "#24292f"
+[theme.glamour.syntax.literal]
+foreground = "#0a3069"
+[theme.glamour.syntax.literal_number]
+foreground = "#0550ae"
+[theme.glamour.syntax.literal_date]
+foreground = "#0a3069"
+[theme.glamour.syntax.literal_string]
+foreground = "#0a3069"
+[theme.glamour.syntax.literal_string_escape]
+foreground = "#953800"
+[theme.glamour.syntax.generic_deleted]
+foreground = "#82071e"
+[theme.glamour.syntax.generic_emph]
+foreground = "#24292f"
+[theme.glamour.syntax.generic_inserted]
+foreground = "#116329"
+[theme.glamour.syntax.generic_strong]
+foreground = "#24292f"
+[theme.glamour.syntax.generic_subheading]
+foreground = "#0969da"
+[theme.glamour.syntax.background]
+background = "#f6f8fa"
+
+# Git diff syntax highlighting. Token values use Chroma/Pygments descriptors:
+# "#RRGGBB", "bold #RRGGBB", "italic #RRGGBB bg:#RRGGBB", etc.
+# Any Chroma v2 token name is accepted, including specific descendants such as
+# KeywordDeclaration, NameFunction, LiteralStringEscape, and CommentPreproc.
+[theme.chroma]
+style = "github"
+
+[theme.chroma.tokens]
+Background = "bg:#ffffff"
+Text = "#24292f"
+Error = "#cf222e"
+Comment = "italic #6e7781"
+Keyword = "bold #cf222e"
+Name = "#24292f"
+NameBuiltin = "#953800"
+NameFunction = "#8250df"
+Literal = "#0a3069"
+LiteralNumber = "#0550ae"
+LiteralString = "#0a3069"
+Operator = "#0550ae"
+Punctuation = "#24292f"
+GenericDeleted = "#82071e"
+GenericInserted = "#116329"
+
+# Select a built-in key base, then replace defaults only for named actions.
+[keys]
+style = "nvim"
+
+# Keys use Bubble Tea names such as ctrl+d, shift+tab, pgdown, space, enter,
+# esc, or one character.
+[keys.viewer]
+quit = ["Q"]
+stage = ["s"]
+info = ["?"]
+back = ["q", "esc"]
+previous = ["shift+tab"]
+next = ["tab"]
+right = ["L", "right"]
+left = ["H", "left"]
+next_diff = ["]"]
+previous_diff = ["["]
+proposal_tab = ["1"]
+design_tab = ["2"]
+specs_tab = ["3"]
+tasks_tab = ["4"]
+git_tab = ["5"]
+next_tab = ["l"]
+previous_tab = ["h"]
+view_diff = ["d", "enter"]
+down = ["j", "down"]
+page_down = ["pgdown", "ctrl+d"]
+up = ["k", "up"]
+page_up = ["pgup", "ctrl+u"]
+toggle_task = ["space"]
+open = ["e"]
+
+[keys.index]
+filter = ["/"]
+info = ["?"]
+new = ["n"]
+lifecycle = ["a"]
+inspect = ["i"]
+edit = ["e"]
+validate = ["v"]
+undo = ["u"]
+back = ["q", "Q", "esc"]
+down = ["j", "down"]
+up = ["k", "up"]
+open = ["enter"]
+toggle = ["space"]
+sort = ["s"]
+
+[keys.filter]
+cancel = ["esc"]
+accept = ["enter"]
+backspace = ["backspace"]
+
+[keys.spec]
+quit = ["Q"]
+back = ["q", "esc"]
+down = ["j", "down"]
+up = ["k", "up"]
+page_down = ["pgdown", "ctrl+d"]
+page_up = ["pgup", "ctrl+u"]
+previous_requirement = ["h"]
+next_requirement = ["l"]
+
+[keys.config]
+back = ["q", "?", "esc"]
+down = ["j", "down"]
+up = ["k", "up"]
+page_down = ["pgdown", "ctrl+d"]
+page_up = ["pgup", "ctrl+u"]

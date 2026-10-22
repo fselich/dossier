@@ -11,14 +11,36 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-type Artifact struct {
-	Content string
-	Present bool
+type ArtifactStatus string
+
+const (
+	ArtifactStatusUnknown ArtifactStatus = ""
+	ArtifactStatusBlocked ArtifactStatus = "blocked"
+	ArtifactStatusReady   ArtifactStatus = "ready"
+	ArtifactStatusDone    ArtifactStatus = "done"
+)
+
+type ArtifactSource string
+
+const (
+	ArtifactSourceDiscovered ArtifactSource = "discovered"
+	ArtifactSourceStatus     ArtifactSource = "status"
+)
+
+type ArtifactOutput struct {
+	RelativePath string
+	DisplayName  string
+	Content      string
+	Present      bool
 }
 
-type NamedSpec struct {
-	Name    string
-	Content string
+type ChangeArtifact struct {
+	ID            string
+	OutputPattern string
+	Status        ArtifactStatus
+	Requires      []string
+	Outputs       []ArtifactOutput
+	Source        ArtifactSource
 }
 
 type Change struct {
@@ -26,11 +48,22 @@ type Change struct {
 	Path        string
 	Created     string
 	DisplayDate string
-	Proposal    Artifact
-	Design      Artifact
-	Tasks       Artifact
-	Specs       Artifact
-	SpecFiles   []NamedSpec
+	Schema      string
+	Diagnostic  string
+	// StatusEnriched marks a change whose artifacts were merged with the
+	// openspec status ladder: discovery-only strays render distinctly and the
+	// planning fraction counts status-source artifacts only.
+	StatusEnriched bool
+	Artifacts      []ChangeArtifact
+}
+
+func (ch Change) ArtifactByID(id string) (ChangeArtifact, bool) {
+	for _, artifact := range ch.Artifacts {
+		if artifact.ID == id {
+			return artifact, true
+		}
+	}
+	return ChangeArtifact{}, false
 }
 
 type Project struct {
@@ -199,6 +232,11 @@ func (l *Loader) ListArchiveChangesFrom(root string) ([]Change, error) {
 	for _, dir := range dirs {
 		cleanName, dispDate := parseArchiveName(dir)
 		ch := l.loadChangeFromDir(filepath.Join(archiveDir, dir), cleanName, dispDate)
+		// Archived changes shipped: their artifacts render as authored
+		// history, never as degraded or stray rows.
+		for i := range ch.Artifacts {
+			ch.Artifacts[i].Status = ArtifactStatusDone
+		}
 		changes = append(changes, ch)
 	}
 	return changes, nil
@@ -260,10 +298,8 @@ func (l *Loader) LoadFromPath(path string) (*Project, error) {
 }
 
 func (l *Loader) ReloadChange(ch Change) Change {
-	ch.Proposal = l.loadFile(filepath.Join(ch.Path, "proposal.md"))
-	ch.Design = l.loadFile(filepath.Join(ch.Path, "design.md"))
-	ch.Tasks = l.loadFile(filepath.Join(ch.Path, "tasks.md"))
-	ch.Specs, ch.SpecFiles = l.loadSpecs(filepath.Join(ch.Path, "specs"))
+	l.loadChangeMetadata(&ch)
+	l.loadDiscoveredArtifacts(&ch)
 	return ch
 }
 
@@ -271,51 +307,184 @@ func (l *Loader) ReloadChange(ch Change) Change {
 
 func (l *Loader) loadChangeFromDir(dir, name, displayDate string) Change {
 	ch := Change{Name: name, Path: dir, DisplayDate: displayDate}
-	if raw, err := l.fs.ReadFile(filepath.Join(dir, ".openspec.yaml")); err == nil {
-		var m openspecMeta
-		// Ignore unmarshal errors: .openspec.yaml is optional metadata,
-		// missing or malformed fields are non-fatal.
-		_ = yaml.Unmarshal(raw, &m)
-		ch.Created = m.Created
-	}
-	ch.Proposal = l.loadFile(filepath.Join(dir, "proposal.md"))
-	ch.Design = l.loadFile(filepath.Join(dir, "design.md"))
-	ch.Tasks = l.loadFile(filepath.Join(dir, "tasks.md"))
-	ch.Specs, ch.SpecFiles = l.loadSpecs(filepath.Join(dir, "specs"))
+	l.loadChangeMetadata(&ch)
+	l.loadDiscoveredArtifacts(&ch)
 	return ch
 }
 
-func (l *Loader) loadFile(path string) Artifact {
-	data, err := l.fs.ReadFile(path)
+func (l *Loader) loadChangeMetadata(ch *Change) {
+	ch.Schema = ""
+	ch.Created = ""
+	ch.Diagnostic = ""
+	raw, err := l.fs.ReadFile(filepath.Join(ch.Path, ".openspec.yaml"))
 	if err != nil {
-		return Artifact{}
+		return
 	}
-	return Artifact{Content: string(data), Present: true}
+	var metadata openspecMeta
+	if err := yaml.Unmarshal(raw, &metadata); err != nil {
+		ch.Diagnostic = fmt.Sprintf(".openspec.yaml: %v", err)
+		return
+	}
+	ch.Schema = metadata.Schema
+	ch.Created = metadata.Created
 }
 
-func (l *Loader) loadSpecs(dir string) (Artifact, []NamedSpec) {
-	entries, err := l.fs.ReadDir(dir)
-	if err != nil {
-		return Artifact{}, nil
+const maxDiscoveredArtifactFiles = 512
+
+func (l *Loader) loadDiscoveredArtifacts(ch *Change) {
+	outputs, diagnostics := l.discoverMarkdownOutputs(ch.Path)
+	for _, diagnostic := range diagnostics {
+		appendChangeDiagnostic(ch, diagnostic)
 	}
-	var parts []string
-	var files []NamedSpec
-	for _, e := range entries {
-		if !e.IsDir() {
-			continue
+
+	byID := make(map[string][]ArtifactOutput)
+	for _, output := range outputs {
+		id := discoveredArtifactID(output.RelativePath)
+		byID[id] = append(byID[id], output)
+	}
+
+	ids := make([]string, 0, len(byID))
+	for id := range byID {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	if ch.Schema == "spec-driven" {
+		ids = orderSpecDrivenArtifacts(ids)
+	}
+
+	ch.Artifacts = make([]ChangeArtifact, 0, len(ids))
+	for _, id := range ids {
+		artifactOutputs := byID[id]
+		pattern := artifactOutputs[0].RelativePath
+		if len(artifactOutputs) > 1 {
+			pattern = id + "/**/*.md"
 		}
-		data, err := l.fs.ReadFile(filepath.Join(dir, e.Name(), "spec.md"))
+		ch.Artifacts = append(ch.Artifacts, ChangeArtifact{
+			ID:            id,
+			OutputPattern: pattern,
+			Status:        ArtifactStatusUnknown,
+			Outputs:       artifactOutputs,
+			Source:        ArtifactSourceDiscovered,
+		})
+	}
+}
+
+func (l *Loader) discoverMarkdownOutputs(root string) ([]ArtifactOutput, []string) {
+	var outputs []ArtifactOutput
+	var diagnostics []string
+	limitReported := false
+	reportLimit := func() {
+		if limitReported {
+			return
+		}
+		diagnostics = append(diagnostics, fmt.Sprintf("artifact discovery limited to %d Markdown files", maxDiscoveredArtifactFiles))
+		limitReported = true
+	}
+	var walk func(string)
+	walk = func(relativeDir string) {
+		if len(outputs) >= maxDiscoveredArtifactFiles {
+			return
+		}
+		dir := filepath.Join(root, filepath.FromSlash(relativeDir))
+		entries, err := l.fs.ReadDir(dir)
 		if err != nil {
-			continue
+			diagnostics = append(diagnostics, fmt.Sprintf("discover %s: %v", displayRelativePath(relativeDir), err))
+			return
 		}
-		content := string(data)
-		files = append(files, NamedSpec{Name: e.Name(), Content: content})
-		parts = append(parts, "# "+e.Name()+"\n\n"+content)
+		sort.Slice(entries, func(i, j int) bool { return entries[i].Name() < entries[j].Name() })
+		for _, entry := range entries {
+			if len(outputs) >= maxDiscoveredArtifactFiles {
+				reportLimit()
+				return
+			}
+			name := entry.Name()
+			if strings.HasPrefix(name, ".") {
+				continue
+			}
+			relativePath := filepath.ToSlash(filepath.Join(relativeDir, name))
+			if entry.Type()&os.ModeSymlink != 0 {
+				diagnostics = append(diagnostics, "ignored symlink "+relativePath)
+				continue
+			}
+			if entry.IsDir() {
+				walk(relativePath)
+				continue
+			}
+			if !strings.EqualFold(filepath.Ext(name), ".md") || (relativeDir == "" && strings.EqualFold(name, "README.md")) {
+				continue
+			}
+			data, err := l.fs.ReadFile(filepath.Join(root, filepath.FromSlash(relativePath)))
+			if err != nil {
+				diagnostics = append(diagnostics, fmt.Sprintf("read %s: %v", relativePath, err))
+				continue
+			}
+			outputs = append(outputs, ArtifactOutput{
+				RelativePath: relativePath,
+				DisplayName:  discoveredOutputName(relativePath),
+				Content:      string(data),
+				Present:      true,
+			})
+		}
 	}
-	if len(parts) == 0 {
-		return Artifact{}, nil
+	walk("")
+	sort.Slice(outputs, func(i, j int) bool { return outputs[i].RelativePath < outputs[j].RelativePath })
+	return outputs, diagnostics
+}
+
+func discoveredArtifactID(relativePath string) string {
+	parts := strings.Split(filepath.ToSlash(relativePath), "/")
+	if len(parts) > 1 {
+		return parts[0]
 	}
-	return Artifact{Content: strings.Join(parts, "\n\n---\n\n"), Present: true}, files
+	return strings.TrimSuffix(parts[0], filepath.Ext(parts[0]))
+}
+
+func discoveredOutputName(relativePath string) string {
+	parts := strings.Split(filepath.ToSlash(relativePath), "/")
+	if len(parts) == 3 && parts[0] == "specs" && parts[2] == "spec.md" {
+		return parts[1]
+	}
+	withoutExt := strings.TrimSuffix(filepath.ToSlash(relativePath), filepath.Ext(relativePath))
+	if len(parts) > 1 {
+		return strings.TrimPrefix(withoutExt, parts[0]+"/")
+	}
+	return withoutExt
+}
+
+func orderSpecDrivenArtifacts(ids []string) []string {
+	preferred := []string{"proposal", "specs", "design", "tasks"}
+	present := make(map[string]bool, len(ids))
+	for _, id := range ids {
+		present[id] = true
+	}
+	ordered := make([]string, 0, len(ids))
+	for _, id := range preferred {
+		if present[id] {
+			ordered = append(ordered, id)
+			delete(present, id)
+		}
+	}
+	for _, id := range ids {
+		if present[id] {
+			ordered = append(ordered, id)
+		}
+	}
+	return ordered
+}
+
+func appendChangeDiagnostic(ch *Change, diagnostic string) {
+	if ch.Diagnostic == "" {
+		ch.Diagnostic = diagnostic
+		return
+	}
+	ch.Diagnostic += "; " + diagnostic
+}
+
+func displayRelativePath(path string) string {
+	if path == "" {
+		return "."
+	}
+	return path
 }
 
 func parseArchiveName(dir string) (name, date string) {
