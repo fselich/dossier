@@ -250,11 +250,11 @@ func TestStatusRenamed(t *testing.T) {
 	if f.X != 'R' && f.Y != 'R' {
 		t.Errorf("expected R status, got X=%c Y=%c", f.X, f.Y)
 	}
-	if f.Path == "" {
-		t.Error("expected non-empty Path")
+	if f.Path != "renamed.go" {
+		t.Errorf("expected Path = new name %q, got %q", "renamed.go", f.Path)
 	}
-	if f.OldPath == "" {
-		t.Error("expected non-empty OldPath")
+	if f.OldPath != "old.go" {
+		t.Errorf("expected OldPath = old name %q, got %q", "old.go", f.OldPath)
 	}
 }
 
@@ -277,8 +277,8 @@ func TestStatusCopied(t *testing.T) {
 	if f.X != 'C' && f.Y != 'C' {
 		return // copy detection may not trigger depending on similarity; not an error
 	}
-	if f.Path == "" || f.OldPath == "" {
-		t.Errorf("expected Path and OldPath, got Path=%q OldPath=%q", f.Path, f.OldPath)
+	if f.Path != "copy.go" || f.OldPath != "orig.go" {
+		t.Errorf("expected Path=%q OldPath=%q, got Path=%q OldPath=%q", "copy.go", "orig.go", f.Path, f.OldPath)
 	}
 }
 
