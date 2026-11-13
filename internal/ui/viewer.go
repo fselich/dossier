@@ -27,11 +27,7 @@ func (m Model) updateViewer(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 		var err error
 		if f.Y != ' ' || f.X == '?' && f.Y == '?' {
-			paths := []string{f.Path}
-			if f.OldPath != "" {
-				paths = []string{f.OldPath, f.Path}
-			}
-			err = git.Stage(m.gitRoot, paths...)
+			err = git.Stage(m.gitRoot, f.Path)
 		} else {
 			paths := []string{f.Path}
 			if f.OldPath != "" {

@@ -77,10 +77,10 @@ func Status(root string) ([]FileStatus, error) {
 		path := p[3:]
 
 		if fs.X == 'R' || fs.Y == 'R' || fs.X == 'C' || fs.Y == 'C' {
-			fs.OldPath = path
+			fs.Path = path
 			i++
 			if i < len(parts) {
-				fs.Path = parts[i]
+				fs.OldPath = parts[i]
 			}
 		} else {
 			fs.Path = path

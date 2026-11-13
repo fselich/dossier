@@ -1397,6 +1397,60 @@ func TestGitSStageModified(t *testing.T) {
 	}
 }
 
+func TestGitSStageRenameWithWorktreeChanges(t *testing.T) {
+	skipIfNoGit(t)
+	dir := t.TempDir()
+	gitInit(t, dir)
+	if err := os.WriteFile(filepath.Join(dir, "old.txt"), []byte("line1\nline2\nline3\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	mustGit(t, dir, "add", "old.txt")
+	mustGit(t, dir, "commit", "-m", "add old")
+	mustGit(t, dir, "mv", "old.txt", "new.txt")
+	if err := os.WriteFile(filepath.Join(dir, "new.txt"), []byte("line1\nline2\nline3\nline4\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	files, err := git.Status(dir)
+	if err != nil {
+		t.Fatalf("Status: %v", err)
+	}
+	if len(files) != 1 || files[0].X != 'R' || files[0].Y != 'M' {
+		t.Fatalf("expected one RM entry, got %+v", files)
+	}
+
+	m := Model{
+		mode:      ModeNormal,
+		tab:       TabGit,
+		root:      dir,
+		gitRoot:   dir,
+		isGitRepo: true,
+		gitState: gitState{
+			Files:  files,
+			Cursor: 0,
+		},
+		width: 80, height: 24,
+	}
+	m.vp = viewport.New(viewport.WithWidth(80), viewport.WithHeight(20))
+	m.vpReady = true
+
+	result, _ := m.dispatchKey(tea.KeyPressMsg{Text: "s"})
+	updated := result.(Model)
+	if updated.gitState.ErrMsg != "" {
+		t.Fatalf("unexpected error: %s", updated.gitState.ErrMsg)
+	}
+	if len(updated.gitState.Files) != 1 {
+		t.Fatalf("expected one entry after stage, got %+v", updated.gitState.Files)
+	}
+	f := updated.gitState.Files[0]
+	if f.X != 'R' || f.Y != ' ' {
+		t.Errorf("expected staged rename (R ), got %c%c", f.X, f.Y)
+	}
+	if f.Path != "new.txt" {
+		t.Errorf("expected Path %q, got %q", "new.txt", f.Path)
+	}
+}
+
 func TestGitSUnstageStaged(t *testing.T) {
 	skipIfNoGit(t)
 	dir := t.TempDir()
