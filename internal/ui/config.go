@@ -5,7 +5,10 @@ import tea "charm.land/bubbletea/v2"
 func (m Model) updateConfig(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 
-	case "q", "ctrl+c", "i", "esc":
+	case "ctrl+c":
+		return m, tea.Quit
+
+	case "q", "i", "esc":
 		m.mode = m.prevMode
 		return m.commitStateChange()
 
