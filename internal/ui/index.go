@@ -661,6 +661,9 @@ func sameStrings(a, b []string) bool {
 func (m Model) updateIndex(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.index.FilterActive {
 		switch msg.String() {
+		case "ctrl+c":
+			return m, tea.Quit
+
 		case "esc":
 			m.index.FilterText = m.index.PrevFilterText
 			m.index.FilterActive = false
@@ -692,6 +695,9 @@ func (m Model) updateIndex(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	}
 
 	switch msg.String() {
+
+	case "q", "ctrl+c":
+		return m, tea.Quit
 
 	case "/":
 		m.index.PrevFilterText = m.index.FilterText

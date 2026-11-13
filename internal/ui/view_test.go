@@ -493,6 +493,70 @@ func TestUpdateKeyPresses(t *testing.T) {
 		}
 	})
 
+	isQuit := func(cmd tea.Cmd) bool {
+		if cmd == nil {
+			return false
+		}
+		_, ok := cmd().(tea.QuitMsg)
+		return ok
+	}
+
+	t.Run("q in index mode quits", func(t *testing.T) {
+		m := Model{mode: ModeIndex}
+		_, cmd := m.dispatchKey(tea.KeyPressMsg{Text: "q"})
+		if !isQuit(cmd) {
+			t.Error("expected quit command")
+		}
+	})
+
+	t.Run("ctrl+c in index mode quits", func(t *testing.T) {
+		m := Model{mode: ModeIndex}
+		_, cmd := m.dispatchKey(tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl})
+		if !isQuit(cmd) {
+			t.Error("expected quit command")
+		}
+	})
+
+	t.Run("ctrl+c while typing a filter quits", func(t *testing.T) {
+		m := Model{mode: ModeIndex, index: indexState{FilterActive: true}}
+		_, cmd := m.dispatchKey(tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl})
+		if !isQuit(cmd) {
+			t.Error("expected quit command")
+		}
+	})
+
+	t.Run("q while typing a filter is added to the query", func(t *testing.T) {
+		m := Model{mode: ModeIndex, width: 80, index: indexState{FilterActive: true}, project: &openspec.Project{}}
+		result, cmd := m.dispatchKey(tea.KeyPressMsg{Text: "q", Code: 'q'})
+		if isQuit(cmd) {
+			t.Error("expected q to be typed, not to quit")
+		}
+		if got := result.(Model).index.FilterText; got != "q" {
+			t.Errorf("expected FilterText %q, got %q", "q", got)
+		}
+	})
+
+	t.Run("ctrl+c in config mode quits", func(t *testing.T) {
+		m := Model{mode: ModeViewingConfig, prevMode: ModeNormal, width: 80, height: 24, project: &openspec.Project{}}
+		m.vp = viewport.New(viewport.WithWidth(80), viewport.WithHeight(20))
+		_, cmd := m.dispatchKey(tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl})
+		if !isQuit(cmd) {
+			t.Error("expected quit command")
+		}
+	})
+
+	t.Run("q in config mode returns to the previous mode", func(t *testing.T) {
+		m := Model{mode: ModeViewingConfig, prevMode: ModeIndex, width: 80, height: 24}
+		m.vp = viewport.New(viewport.WithWidth(80), viewport.WithHeight(20))
+		result, cmd := m.dispatchKey(tea.KeyPressMsg{Text: "q"})
+		if isQuit(cmd) {
+			t.Error("expected q to go back, not to quit")
+		}
+		if got := result.(Model).mode; got != ModeIndex {
+			t.Errorf("expected ModeIndex, got %d", got)
+		}
+	})
+
 	t.Run("j moves cursor down in index", func(t *testing.T) {
 		m := Model{
 			mode:  ModeIndex,
