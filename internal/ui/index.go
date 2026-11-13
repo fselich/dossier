@@ -167,6 +167,10 @@ func (m *Model) enterIndex() {
 		m.errMsg = "error loading project specs: " + specErr.Error()
 	}
 	m.index.ExpandedSpecs = make(map[int]bool)
+	m.index.FilterText = ""
+	m.index.PrevFilterText = ""
+	m.index.FilterActive = false
+	m.index.FilterIndices = nil
 	m.buildIndexItems()
 	m.index.Cursor = 0
 	m.mode = ModeIndex

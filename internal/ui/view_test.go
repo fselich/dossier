@@ -1148,6 +1148,111 @@ func TestIndexFilteredNavigation(t *testing.T) {
 	})
 }
 
+func TestIndexFilterCursorConsistency(t *testing.T) {
+	t.Run("wheel down stops at the last filtered item", func(t *testing.T) {
+		m := Model{
+			mode:    ModeIndex,
+			width:   80,
+			height:  24,
+			project: &openspec.Project{Changes: []openspec.Change{{Name: "x-one"}, {Name: "two"}}},
+			index: indexState{
+				Items: []indexItem{
+					{kind: indexKindSection, idx: 0},
+					{kind: indexKindActive, idx: 0},
+					{kind: indexKindActive, idx: 1},
+				},
+				FilterText:    "x",
+				FilterIndices: []int{0, 1},
+				Cursor:        1,
+			},
+		}
+		m.vp = viewport.New(viewport.WithWidth(80), viewport.WithHeight(20))
+
+		result, _ := m.handleMouseWheel(tea.MouseWheelMsg{Button: tea.MouseWheelDown})
+		updated := result.(Model)
+		if updated.index.Cursor != 1 {
+			t.Errorf("expected cursor to stay on last filtered item (1), got %d", updated.index.Cursor)
+		}
+	})
+
+	t.Run("clicking a selected spec under a filter keeps the cursor on it", func(t *testing.T) {
+		m := Model{
+			mode:    ModeIndex,
+			width:   80,
+			height:  24,
+			project: &openspec.Project{},
+			projectSpecs: []openspec.ProjectSpec{
+				{Name: "billing-api", RequirementNames: []string{"Invoice"}},
+				{Name: "user-auth", RequirementNames: []string{"Login", "Logout"}},
+			},
+			index: indexState{
+				ExpandedSpecs: make(map[int]bool),
+				FilterText:    "auth",
+			},
+		}
+		m.vp = viewport.New(viewport.WithWidth(80), viewport.WithHeight(20))
+		m.buildIndexItems()
+		m.applyFilter()
+		specRaw := -1
+		for fi, ri := range m.index.FilterIndices {
+			if m.index.Items[ri].kind == indexKindSpec && m.index.Items[ri].idx == 1 {
+				m.index.Cursor = fi
+				specRaw = ri
+			}
+		}
+		if specRaw < 0 || specRaw == m.index.Cursor {
+			t.Fatalf("test setup: expected user-auth at different raw (%d) and filtered (%d) positions", specRaw, m.index.Cursor)
+		}
+
+		result, _ := m.clickIndexItem(specRaw)
+		updated := result.(Model)
+		if !updated.index.ExpandedSpecs[1] {
+			t.Error("expected user-auth to be expanded")
+		}
+		if updated.index.Cursor >= updated.visibleItemCount() {
+			t.Fatalf("cursor %d out of range for %d visible items", updated.index.Cursor, updated.visibleItemCount())
+		}
+		item := updated.index.Items[updated.visibleItemIdx(updated.index.Cursor)]
+		if item.kind != indexKindSpec || item.idx != 1 {
+			t.Errorf("expected cursor on spec user-auth, got kind=%d idx=%d", item.kind, item.idx)
+		}
+	})
+
+	t.Run("re-entering the index clears the filter", func(t *testing.T) {
+		root := t.TempDir()
+		for _, name := range []string{"billing-api", "user-auth"} {
+			dir := filepath.Join(root, "openspec", "specs", name)
+			if err := os.MkdirAll(dir, 0755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(dir, "spec.md"), []byte("### Requirement: Login\n"), 0644); err != nil {
+				t.Fatal(err)
+			}
+		}
+		m := Model{
+			mode:    ModeNormal,
+			width:   80,
+			height:  24,
+			root:    root,
+			loader:  testLoader(),
+			project: &openspec.Project{},
+			index: indexState{
+				ExpandedSpecs: make(map[int]bool),
+				FilterText:    "auth",
+			},
+		}
+		m.vp = viewport.New(viewport.WithWidth(80), viewport.WithHeight(20))
+
+		m.enterIndex()
+		if m.index.FilterText != "" || m.index.FilterIndices != nil {
+			t.Errorf("expected filter cleared on entering the index, got FilterText=%q FilterIndices=%v", m.index.FilterText, m.index.FilterIndices)
+		}
+		if m.index.Cursor >= m.visibleItemCount() {
+			t.Errorf("cursor %d out of range for %d visible items", m.index.Cursor, m.visibleItemCount())
+		}
+	})
+}
+
 func TestRenderTabBar(t *testing.T) {
 	t.Run("active tab highlighted", func(t *testing.T) {
 		m := &Model{
