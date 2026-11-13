@@ -493,6 +493,49 @@ func TestUpdateKeyPresses(t *testing.T) {
 		}
 	})
 
+	isQuit := func(cmd tea.Cmd) bool {
+		if cmd == nil {
+			return false
+		}
+		_, ok := cmd().(tea.QuitMsg)
+		return ok
+	}
+
+	t.Run("q in index mode quits", func(t *testing.T) {
+		m := Model{mode: ModeIndex}
+		_, cmd := m.dispatchKey(tea.KeyPressMsg{Text: "q"})
+		if !isQuit(cmd) {
+			t.Error("expected quit command")
+		}
+	})
+
+	t.Run("ctrl+c in index mode quits", func(t *testing.T) {
+		m := Model{mode: ModeIndex}
+		_, cmd := m.dispatchKey(tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl})
+		if !isQuit(cmd) {
+			t.Error("expected quit command")
+		}
+	})
+
+	t.Run("ctrl+c while typing a filter quits", func(t *testing.T) {
+		m := Model{mode: ModeIndex, index: indexState{FilterActive: true}}
+		_, cmd := m.dispatchKey(tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl})
+		if !isQuit(cmd) {
+			t.Error("expected quit command")
+		}
+	})
+
+	t.Run("q while typing a filter is added to the query", func(t *testing.T) {
+		m := Model{mode: ModeIndex, width: 80, index: indexState{FilterActive: true}, project: &openspec.Project{}}
+		result, cmd := m.dispatchKey(tea.KeyPressMsg{Text: "q", Code: 'q'})
+		if isQuit(cmd) {
+			t.Error("expected q to be typed, not to quit")
+		}
+		if got := result.(Model).index.FilterText; got != "q" {
+			t.Errorf("expected FilterText %q, got %q", "q", got)
+		}
+	})
+
 	t.Run("j moves cursor down in index", func(t *testing.T) {
 		m := Model{
 			mode:  ModeIndex,
