@@ -94,8 +94,18 @@ func parseDiff(raw string) []DiffLine {
 	lines := strings.Split(raw, "\n")
 	result := make([]DiffLine, 0, len(lines))
 	oldNum, newNum := 0, 0
+	inHunk := false
 	for _, line := range lines {
-		dl := parseDiffLine(line, &oldNum, &newNum)
+		// A file's header runs from "diff --git" to its first "@@". Inside a
+		// hunk every line starts with ' ', '+', '-' or '\', so neither marker
+		// can appear there as content.
+		switch {
+		case strings.HasPrefix(line, "diff --git"):
+			inHunk = false
+		case strings.HasPrefix(line, "@@"):
+			inHunk = true
+		}
+		dl := parseDiffLine(line, inHunk, &oldNum, &newNum)
 		if dl != nil {
 			result = append(result, *dl)
 		}
@@ -125,19 +135,26 @@ func parseHunkHeader(line string, oldNum, newNum *int) {
 	}
 }
 
-func parseDiffLine(line string, oldNum, newNum *int) *DiffLine {
-	switch {
-	case strings.HasPrefix(line, "diff --git"),
-		strings.HasPrefix(line, "index "),
-		strings.HasPrefix(line, "new file"),
-		strings.HasPrefix(line, "deleted file"),
-		strings.HasPrefix(line, "similarity"),
-		strings.HasPrefix(line, "rename"),
-		strings.HasPrefix(line, "old mode"),
-		strings.HasPrefix(line, "new mode"),
-		strings.HasPrefix(line, "--- "),
-		strings.HasPrefix(line, "+++ "):
+// isDiffHeaderLine reports whether line is one of the per-file header lines
+// git prints before the first hunk. It must only be applied outside a hunk:
+// inside one, "--- x" is a removed line "-- x" and "+++ x" an added "++ x".
+func isDiffHeaderLine(line string) bool {
+	for _, prefix := range []string{
+		"diff --git", "index ", "new file", "deleted file", "similarity",
+		"rename", "old mode", "new mode", "--- ", "+++ ",
+	} {
+		if strings.HasPrefix(line, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+func parseDiffLine(line string, inHunk bool, oldNum, newNum *int) *DiffLine {
+	if !inHunk && isDiffHeaderLine(line) {
 		return nil
+	}
+	switch {
 	case strings.HasPrefix(line, "@@"):
 		parseHunkHeader(line, oldNum, newNum)
 		return &DiffLine{Type: LineHunkHeader, Content: line, OldNum: -1, NewNum: -1}
